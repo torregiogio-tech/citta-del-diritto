@@ -125,7 +125,21 @@ const SPEED_N = 10, SPEED_T = 10;   // speed round: 10 domande, 10 secondi l'una
 const KEY = 'dp8bit-v1';   // stessa chiave della versione 8-bit: i progressi restano
 const S = { xp: 0, srs: {}, boy: 'felpa', tema: 'giorno', sound: true, filtro: 'tutto', medaglie: {}, voto: 0, pos: null, aiuto: true,
   monete: 30, reddito: 0, looks: {}, acc: null, cap: null, studio: {}, speed: {}, zoom: 1, evo: 0, pal: {} };
-function load() { try { Object.assign(S, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { /* senza storage si gioca senza salvare */ } }
+const DEF = JSON.parse(JSON.stringify(S));
+// Un salvataggio (anche importato da file) può contenere solo i campi noti, con il tipo giusto e senza testo libero: niente HTML iniettato
+const SENZA_TESTO = v => v === null || typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v)) || (typeof v === 'object' && Object.values(v).every(SENZA_TESTO));
+const ID_OK = { boy: SKIN_BOY.map(x => x.id), tema: TEMI.map(x => x.id), acc: LOOKS.filter(l => l.tipo === 'acc').map(l => l.id), cap: LOOKS.filter(l => l.tipo === 'cap').map(l => l.id) };
+function pulito(dati) {
+  const out = {};
+  for (const k of Object.keys(DEF)) {
+    const v = dati && dati[k]; if (v === undefined || (v === null && DEF[k] !== null)) continue;
+    if (k in ID_OK) { if (v === null || ID_OK[k].includes(v)) out[k] = v; }
+    else if (k === 'filtro') { if (typeof v === 'string' && /^(tutto|ripasso|g\d|c\d\d)$/.test(v)) out[k] = v; }
+    else if (typeof v === typeof DEF[k] || (k === 'pos' && Array.isArray(v))) { if (SENZA_TESTO(v)) out[k] = v; }
+  }
+  return out;
+}
+function load() { try { Object.assign(S, pulito(JSON.parse(localStorage.getItem(KEY)))); } catch (e) { /* senza storage si gioca senza salvare */ } }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } }
 const salvaPos = () => { if (M.ok) { S.pos = M.posizione(); save(); } };
 
@@ -622,7 +636,7 @@ function importa(testo) {
   try {
     const dati = JSON.parse(testo);
     if (typeof dati.xp !== 'number' || typeof dati.srs !== 'object') throw new Error('formato');
-    Object.assign(S, dati); save(); aggiornaHUD(); M.vestito(S.boy, lookAttuale()); M.tema(S.tema); segni(); M.libri(ARG.map(nStudio));
+    Object.assign(S, pulito(dati)); save(); aggiornaHUD(); M.vestito(S.boy, lookAttuale()); M.tema(S.tema); segni(); M.libri(ARG.map(nStudio));
     finestra('Progressi importati ✔', `Punti: ${S.xp}`);
   } catch (e) { finestra('File non valido', 'Scegli il file esportato dall\'app.'); }
 }
@@ -948,6 +962,7 @@ if (location.search.includes('test')) {
     S.xp = 55; aggiungiXP(10); ok(coda.some(m => m.titolo.includes('SBLOCCATO')), 'sblocco a 60 punti');
     coda.length = 0; $('#modal').hidden = true;
     save(); const prima = JSON.stringify(S); S.xp = -1; load(); ok(JSON.stringify(S) === prima, 'salva e ricarica');
+    ok(JSON.stringify(pulito({ monete: '<img src=x>', pal: { g1: { v: ['<b>'], rip: [1] } }, boy: '<x>', filtro: '"><x>', xp: 5, pos: [1, 2] })) === '{"xp":5,"pos":[1,2]}', 'salvataggi importati ripuliti');
     const sim = creaSim(); ok(sim.length === 10 && new Set(sim.map(x => x.id.slice(0, 3))).size === 10, 'esame: 10 capitoli diversi');
     ok(sim.filter(x => x.tipo === 'crocette').length === 5, 'esame: 5 crocette');
     ok(votoDa(10, 10) === '30 e lode' && votoDa(6, 10) === '18', 'voto in trentesimi');
