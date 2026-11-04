@@ -1,6 +1,7 @@
 // Città del Diritto: logica del gioco e interfaccia. Il mondo 3D sta in mondo.js;
 // le domande arrivano da domande.js (window.DOMANDE), generato da _sorgenti/build.py.
 import * as M from './mondo.js';
+import { CITTA, ENIGMI, posto, PASSO } from './storia.js';
 
 const D = window.DOMANDE;
 const CAPS = [...new Map(D.map(q => [q.id.slice(0, 3), { id: q.id.slice(0, 3), titolo: q.capitolo, giorno: q.giorno }])).values()];
@@ -18,40 +19,41 @@ const TUTOR = ['Marco', 'Luca', 'Davide', 'Paolo', 'Simone', 'Andrea', 'Matteo',
 const DOTT = ['Giulia', 'Sara', 'Chiara', 'Elena', 'Marta', 'Irene', 'Laura', 'Anna'];
 const CAPELLI = ['#2a1a10', '#8a4a1a', '#d9a441', '#1a1a1a', '#6a4020', '#c0392b'];
 
-// ---------- I luoghi della città: un palazzo per ogni giorno di studio ----------
+// ---------- I palazzi del gioco: una palestra per cittadina (le posizioni vengono da storia.js) ----------
 const LUOGHI = [
-  { id: 'g1', giorno: 1, nome: 'Università', stile: 'universita', x: -12, z: 16, prof: 'Prof. Sovrani',
+  { id: 'g1', giorno: 1, nome: 'Palazzo della Sovranità', stile: 'universita', ...posto(1, 'C'), prof: 'Prof. Sovrani',
     frase: 'Popolo, territorio, sovranità… Prima di tutto: sai dirmi cos\'è lo Stato e come è cambiato nella storia?',
     persona: { corpo: '#7a5232', gambe: '#4a3a2a', camicia: true, cravatta: '#b03030', stile: 'calvo', capelli: '#c9c9c9', barba: '#c9c9c9', occhiali: '#2a2420' } },
-  { id: 'g2', giorno: 2, nome: 'Seggio elettorale', stile: 'seggio', x: 12, z: 16, prof: 'Prof.ssa Urna',
+  { id: 'g2', giorno: 2, nome: 'Seggio elettorale', stile: 'seggio', ...posto(2, 'D'), prof: 'Prof.ssa Urna',
     frase: 'Parlamentare o presidenziale? Maggioritario o proporzionale? Vediamo se sai distinguerli.',
     persona: { corpo: '#7a4cc4', gambe: '#3a2a5a', stile: 'chignon', capelli: '#8a2a1a' } },
-  { id: 'g3', giorno: 3, nome: 'Montecitorio', stile: 'montecitorio', x: -12, z: -4, prof: 'On. Camerini',
+  { id: 'g3', giorno: 3, nome: 'Montecitorio', stile: 'montecitorio', ...posto(3, 'C'), prof: 'On. Camerini',
     frase: 'Fiducia, decreti-legge, procedimento legislativo: il Governo e il Parlamento non hanno segreti per te?',
     persona: { corpo: '#22305a', gambe: '#22305a', camicia: true, cravatta: '#1f9e4a', stile: 'corti', capelli: '#1a1a1a' } },
-  { id: 'g4', giorno: 4, nome: 'Quirinale', stile: 'quirinale', x: 12, z: -4, prof: 'Prof. Colle',
+  { id: 'g4', giorno: 4, nome: 'Quirinale', stile: 'quirinale', ...posto(4, 'D'), prof: 'Prof. Colle',
     frase: 'Il Capo dello Stato e la Corte costituzionale: i garanti. Pronto a parlarne?',
     persona: { corpo: '#3a3a44', gambe: '#3a3a44', camicia: true, cravatta: '#1d3f99', stile: 'corti', capelli: '#f0f0f0' } },
-  { id: 'g5', giorno: 5, nome: 'Archivio delle leggi', stile: 'biblioteca', x: -12, z: -24, prof: 'Prof.ssa Fonti',
+  { id: 'g5', giorno: 5, nome: 'Archivio delle leggi', stile: 'biblioteca', ...posto(5, 'C'), prof: 'Prof.ssa Fonti',
     frase: 'Costituzione rigida, gerarchia delle fonti, riserva di legge: qui si studia sul serio.',
     persona: { corpo: '#2f8a5a', gambe: '#2a3a3a', stile: 'lunghi', capelli: '#5a3018', occhiali: '#c33333', libro: '#c0392b' } },
-  { id: 'g6', giorno: 6, nome: 'Palazzo Europa', stile: 'europa', x: 12, z: -24, prof: 'Dott.ssa Europa',
+  { id: 'g6', giorno: 6, nome: 'Palazzo Europa', stile: 'europa', ...posto(6, 'D'), prof: 'Dott.ssa Europa',
     frase: 'Regolamenti, direttive, primato del diritto UE… e poi il bilancio. Cominciamo?',
     persona: { corpo: '#1d3f99', gambe: '#1d2a5a', camicia: true, cravatta: '#ffd23f', stile: 'lunghi', capelli: '#e8c15a' } },
-  { id: 'g7', giorno: 7, nome: 'Regione', stile: 'regione', x: -12, z: -44, prof: 'Dott. Comuni',
+  { id: 'g7', giorno: 7, nome: 'Regione', stile: 'regione', ...posto(7, 'C'), prof: 'Dott. Comuni',
     frase: 'Titolo V, autonomie locali e Pubblica Amministrazione. Sei pronto?',
     persona: { corpo: '#e07b39', gambe: '#3a3a4a', stile: 'corti', capelli: '#6a4020', barba: '#6a4020' } },
-  { id: 'g8', giorno: 8, nome: 'Tribunale', stile: 'tribunale', x: 12, z: -44, prof: 'Avv. Libertà',
+  { id: 'g8', giorno: 8, nome: 'Tribunale', stile: 'tribunale', ...posto(8, 'D'), prof: 'Avv. Libertà',
     frase: 'Diritti, libertà e giurisdizione: l\'ultimo passo prima dell\'esame.',
     persona: { corpo: '#151515', gambe: '#151515', toga: '#151515', bavaglino: true, cordoni: '#d4af37', stile: 'corti', capelli: '#8a8a8a' } },
-  { id: 'esame', nome: 'Rettorato', stile: 'rettorato', x: 0, z: -66, prof: 'Il Professore',
+  { id: 'esame', nome: 'Rettorato', stile: 'rettorato', x: 0, z: -PASSO * 9 - 12, prof: 'Il Professore',
     frase: 'Si accomodi. Dieci domande su tutto il programma: 5 a crocette e 5 orali. Vediamo che voto prende.',
     persona: { corpo: '#151515', gambe: '#151515', toga: '#151515', collare: '#d4af37', tocco: true, stile: 'calvo', capelli: '#ffffff', barba: '#ffffff', occhiali: '#d4af37', scala: 1.18 } },
-  { id: 'casa', nome: 'Casa', stile: 'casa', x: -12, z: 34, prof: 'Armadio' },
-  { id: 'biblio', nome: 'Biblioteca', stile: 'libreria', x: 12, z: 34, prof: 'La Bibliotecaria',
+  { id: 'casa', nome: 'Casa', stile: 'casa', ...posto(0, 'A'), prof: 'Armadio' },
+  { id: 'biblio', nome: 'Biblioteca', stile: 'libreria', ...posto(0, 'B'), prof: 'La Bibliotecaria',
     persona: { corpo: '#8e5a9e', gambe: '#3a2a3a', stile: 'chignon', capelli: '#b8b8b8', occhiali: '#8a5a2b', libro: '#2f8a5a' } },
 ];
 const LUOGO = Object.fromEntries(LUOGHI.map(l => [l.id, l]));
+const zonaL = L => L.giorno || (L.id === 'esame' ? 9 : 0);   // in quale cittadina sta un palazzo
 
 // ---------- Skin: vestiti e ambientazioni, sbloccati con i punti ----------
 const SKIN_BOY = [
@@ -124,7 +126,8 @@ const SPEED_N = 10, SPEED_T = 10;   // speed round: 10 domande, 10 secondi l'una
 // ---------- Salvataggio ----------
 const KEY = 'dp8bit-v1';   // stessa chiave della versione 8-bit: i progressi restano
 const S = { xp: 0, srs: {}, boy: 'felpa', tema: 'giorno', sound: true, filtro: 'tutto', medaglie: {}, voto: 0, pos: null, aiuto: true,
-  monete: 30, reddito: 0, looks: {}, acc: null, cap: null, studio: {}, speed: {}, zoom: 1, evo: 0, pal: {} };
+  monete: 30, reddito: 0, looks: {}, acc: null, cap: null, studio: {}, speed: {}, zoom: 1.8, evo: 0, pal: {},
+  nome: '', compagno: '', amico: 0, enigmi: {}, visti: { 0: true }, imparati: {}, mondo: 0 };   // mondo: versione della mappa (2 = cittadine)
 const DEF = JSON.parse(JSON.stringify(S));
 // Un salvataggio (anche importato da file) può contenere solo i campi noti, con il tipo giusto e senza testo libero: niente HTML iniettato
 const SENZA_TESTO = v => v === null || typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v)) || (typeof v === 'object' && Object.values(v).every(SENZA_TESTO));
@@ -134,6 +137,7 @@ function pulito(dati) {
   for (const k of Object.keys(DEF)) {
     const v = dati && dati[k]; if (v === undefined || (v === null && DEF[k] !== null)) continue;
     if (k in ID_OK) { if (v === null || ID_OK[k].includes(v)) out[k] = v; }
+    else if (k === 'nome' || k === 'compagno') { if (typeof v === 'string') out[k] = v.slice(0, 20); }   // testo libero: sempre esc() quando si mostra
     else if (k === 'filtro') { if (typeof v === 'string' && /^(tutto|ripasso|g\d|c\d\d)$/.test(v)) out[k] = v; }
     else if (typeof v === typeof DEF[k] || (k === 'pos' && Array.isArray(v))) { if (SENZA_TESTO(v)) out[k] = v; }
   }
@@ -234,8 +238,11 @@ function mostraAzione(id) {
   vicinoId = id;
   const b = $('#azione');
   if (!id || !foglio.hidden) { b.hidden = true; return; }
-  const L = LUOGO[id], P = palAtt && gentePalestra(LUOGO[palAtt]).find(p => p.id === id);
-  b.textContent = id === 'evento' ? `⚔️ ${incontro ? incontro.tipo.nome : '…'} ti sfida!` : id === 'casa' ? '👕 Apri l\'armadio' : id === 'biblio' ? '📚 Entra in biblioteca'
+  const L = LUOGO[id], P = palAtt && gentePalestra(LUOGO[palAtt]).find(p => p.id === id), mon = monumento(id);
+  if (/^varco-\d$/.test(id) && varcoAperto(+id.slice(6))) { b.hidden = true; return; }
+  b.textContent = mon ? `💡 ${mon.nome}: ${S.compagno || 'il compagno'} ti spiega` : /^varco-/.test(id) ? `🔒 Varco ${+id.slice(6) + 1}: cosa serve?`
+    : /^leva-/.test(id) ? `🎚 Leggi la leva ${+id.split('-')[2] + 1}` : /^sportello-/.test(id) ? `🗂 ${ENIGMI[+id.slice(10)].titolo}`
+    : id === 'evento' ? `⚔️ ${incontro ? incontro.tipo.nome : '…'} ti sfida!` : id === 'casa' ? '👕 Apri l\'armadio' : id === 'biblio' ? '📚 Entra in biblioteca'
     : id === 'esame' ? '📝 Parla con Il Professore' : id === 'pal-uscita' ? '🚪 Esci dalla palestra' : id === 'pal-capo' ? `👑 Sfida ${P.nome}`
     : P ? `⚔️ Lotta con ${P.nome}` : `🥊 Palestra di ${L.prof}`;
   b.hidden = false;
@@ -250,8 +257,12 @@ function parla(id) {
   if (id === 'pal-uscita') return esciPalestra();
   if (id === 'pal-capo') return parlaCapo();
   if (/^pal-a\d$/.test(id)) return parlaAllenatore(+id.slice(-1) - 1);
+  if (monumento(id)) return lezione(id);
+  if (/^varco-/.test(id)) return parlaVarco(+id.slice(6));
+  if (/^leva-/.test(id)) { const [, k, i] = id.split('-'); return parlaLeva(+k, +i); }
+  if (/^sportello-/.test(id)) return sportello(+id.slice(10));
   const L = LUOGO[id]; suona('tap'); M.guarda(id); salvaPos();
-  const testa = `<div class="chi">${esc(L.prof)} <small>· ${esc(L.nome)}${L.giorno ? ' · Giorno ' + L.giorno : ''}</small></div><div class="fumetto">${esc(L.frase)}</div>`;
+  const testa = `<div class="chi">${esc(L.prof)} <small>· ${esc(L.nome)}${L.giorno ? ' · ' + esc(CITTA[L.giorno].nome) : ''}</small></div><div class="fumetto">${esc(L.frase)}</div>`;
   if (id === 'esame') {
     apri(`${testa}<div class="info">Miglior voto: <b>${S.voto ? (S.voto > 30 ? '30 e lode' : S.voto + '/30') : '—'}</b> · Medaglie: ${$('#med').textContent}/8</div>
       <button class="giallo" id="b-via">📝 Inizia l'esame</button><button class="grigio" id="b-no">Più tardi</button>`);
@@ -259,7 +270,7 @@ function parla(id) {
   } else {
     const caps = CAPS.filter(c => c.giorno === L.giorno), p = statoPal(id), G2 = gentePalestra(L);
     apri(`${testa}<div class="info">📚 ${caps.map(c => esc(c.titolo)).join('<br>📚 ')}</div>
-      <div class="card">🥊 <b>Palestra del Giorno ${L.giorno}</b><br>${[0, 1].map(k => `${p.rip[k] ? '⚠️' : p.v[k] ? '✅' : '⬜'} ${esc(G2[k].nome)}`).join('<br>')}
+      <div class="card">🥊 <b>Palestra di ${esc(CITTA[L.giorno].nome)}</b><br>${[0, 1].map(k => `${p.rip[k] ? '⚠️' : p.v[k] ? '✅' : '⬜'} ${esc(G2[k].nome)}`).join('<br>')}
         <br>${S.medaglie[id] ? '🏅' : '👑'} ${esc(L.prof)} <small>(capopalestra: sfida perfetta)</small></div>
       ${p.rip.some(Boolean) ? '<div class="card posta">⚠️ Un allenatore di questa palestra ha la tua domanda rubata: battilo di nuovo senza errori per riprenderla.</div>' : ''}
       <button class="giallo" id="b-via">🚪 Entra in palestra</button><button class="grigio" id="b-no">Più tardi</button>`);
@@ -296,7 +307,7 @@ function setAllenatore(giorno, k) {   // sempre le stesse 3 domande: così la ri
   return base.slice(k * 3, k * 3 + 3).map((q, i) => q.tipo === 'crocette' ? q : mcDaFlashcard(q, i % 2 ? 'term' : 'def'));
 }
 let toastT;
-function toast(html) { const t = $('#toast'); t.innerHTML = html; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 4500); }
+function toast(html, ms = 4500) { const t = $('#toast'); t.innerHTML = html; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, ms); }
 function entraPalestra(id) {
   suona('tap'); sess = null; salvaPos(); palAtt = id;
   M.palestra(LUOGO[id], gentePalestra(LUOGO[id])); segni();
@@ -313,7 +324,7 @@ function esciPalestra() { palAtt = null; M.esciPalestra(); segni(); $('#toast').
 function parlaAllenatore(k) {
   const L = LUOGO[palAtt], p = statoPal(palAtt), A = gentePalestra(L)[k], riv = p.rip[k] > 0;
   suona('tap'); M.guarda(A.id);
-  apri(`<div class="chi">${esc(A.nome)} <small>· allenatore · Giorno ${L.giorno}</small></div>
+  apri(`<div class="chi">${esc(A.nome)} <small>· allenatore · ${esc(CITTA[L.giorno].nome)}</small></div>
     <div class="fumetto">${riv ? 'Ehi! Ce l\'ho io la domanda che hai perso. Rispondi giusto a tutte e 3 le mie domande e te la ridò… ma quale fosse non te lo dico 😏'
       : p.v[k] ? 'Ancora tu? Va bene, ripassiamo!' : k ? 'Il capopalestra è il prossimo… se riesci a battermi.' : 'Per arrivare al capopalestra devi passare da me!'}</div>
     <div class="info">${riv ? `🙈 <b>Rivincita alla cieca</b>: 3 domande, nessun aiuto e nessun indizio fino alla fine. Tutte giuste = <b>+${p.rip[k]} ⭐</b> restituite.`
@@ -348,7 +359,7 @@ function parlaCapo() {
       <button class="giallo" id="b-no">Ok</button>`);
     $('#b-no').onclick = chiudi; return;
   }
-  apri(`<div class="chi">${esc(L.prof)} <small>· capopalestra · Giorno ${L.giorno}</small></div><div class="fumetto">${esc(L.frase)}</div>
+  apri(`<div class="chi">${esc(L.prof)} <small>· capopalestra · ${esc(CITTA[L.giorno].nome)}</small></div><div class="fumetto">${esc(L.frase)}</div>
     <div class="info">👑 <b>Sfida perfetta</b>: ${HP_CAPO} domande (crocette e domande d'esame). Un errore e sei KO${e.vite ? ` — ma hai 💖 ${e.vite} seconde vite` : ''}.
       ${S.medaglie[palAtt] ? '<br>🏅 Medaglia già vinta: rigioca per ripassare.' : ''}</div>
     <button class="giallo" id="b-via">⚔️ Sfida il capopalestra</button><button class="grigio" id="b-no">Più tardi</button>`);
@@ -362,7 +373,7 @@ function lottaCapo() {
       if (vinta) {
         const prima = !S.medaglie[L.id]; S.medaglie[L.id] = true; save(); segni(); aggiungiXP(prima ? 50 : 15);
         apri(`<div class="big">🏅</div><h2 style="text-align:center">${esc(L.prof)} è KO!</h2>
-          <div class="info" style="text-align:center">${prima ? `Medaglia del Giorno ${L.giorno} conquistata! +50 ⭐` : 'Sfida vinta di nuovo: +15 ⭐'}</div>
+          <div class="info" style="text-align:center">${prima ? `Medaglia di ${esc(CITTA[L.giorno].nome)} conquistata! +50 ⭐` : 'Sfida vinta di nuovo: +15 ⭐'}</div>
           <button class="viola" id="b-speed">⚡ Speed round finale: 10 domande, punti extra!</button>
           ${errori}<button class="giallo" id="b-ok">Continua</button><button class="grigio" id="b-ri">⚔️ Rigioca</button>`);
       } else {
@@ -371,7 +382,7 @@ function lottaCapo() {
           ${errori}<button class="giallo" id="b-ri">⚔️ Riprova</button><button class="viola" id="b-speed">⚡ Speed round per rifarti</button><button class="grigio" id="b-ok">Continua</button>`);
       }
       $('#b-ok').onclick = chiudi; $('#b-ri').onclick = lottaCapo;
-      $('#b-speed').onclick = () => avviaSpeed(`Giorno ${L.giorno}`, q => q.giorno === L.giorno, L.id, chiudi);
+      $('#b-speed').onclick = () => avviaSpeed(CITTA[L.giorno].nome, q => q.giorno === L.giorno, L.id, chiudi);
     } });
 }
 
@@ -406,7 +417,7 @@ function barraDuello() {
     const riga = (nome, sotto, p, num) => `<div class="pk"><span class="nome"><b>${esc(nome)}</b><small>${sotto}</small></span>${p === null ? '<span class="fill"></span>'
       : `<div class="hp"><i class="${col(p)}" style="width:${p}%"></i></div>`}<span class="num">${num}</span></div>`;
     d.innerHTML = o.cieco ? riga(o.nome, '🙈 rivincita alla cieca', null, `domanda ${Math.min(s.k, s.lista.length)}/${s.lista.length}`)
-      : riga(o.nome, esc(o.ruolo), pct(s.hp, o.hp), `${s.hp}/${o.hp}`) + riga('Tu', `Lv.${e.liv} ${esc(e.nome)}`, pct(s.mio, s.mioMax), `${s.mio}/${s.mioMax}${s.vite ? ` 💖${s.vite}` : ''}`)
+      : riga(o.nome, esc(o.ruolo), pct(s.hp, o.hp), `${s.hp}/${o.hp}`) + riga(S.nome || 'Tu', `Lv.${e.liv} ${esc(e.nome)}`, pct(s.mio, s.mioMax), `${s.mio}/${s.mioMax}${s.vite ? ` 💖${s.vite}` : ''}`)
         + (s.msg ? `<div class="msg">${s.msg}</div>` : '');
   } else {
     d.innerHTML = `<div class="drow"><b>Il Professore</b><span class="fill"></span><span class="tacche esame">${s.lista.map((q, i) =>
@@ -435,7 +446,7 @@ function prossima() {
     s.q = s.lista ? s.lista[s.k++ % s.lista.length] : domandaLotta(s); s.usate.add(s.q.base || s.q.id);
   }
   else s.q = pesca(pool(s.tipo), s.q && s.q.id);
-  s.fase = 0; s.tolte = null; if (s.q.tipo === 'crocette') s.ordine = mescola([0, 1, 2, 3]);
+  s.fase = 0; s.tolte = null; s.hint = ''; if (s.q.tipo === 'crocette') s.ordine = mescola([0, 1, 2, 3]);
   barraDuello(); disegnaDomanda(); if (s.lotta) s.msg = '';
 }
 function disegnaDomanda() {
@@ -453,7 +464,9 @@ function disegnaDomanda() {
       const cls = !s.fase ? (via ? 'spenta' : '') : cieco ? (i === s.scelta ? 'scelta' : 'spenta') : i === q.corretta ? 'giusta' : i === s.scelta ? 'sbagliata' : 'spenta';
       return `<button class="opz ${cls}" data-i="${i}" ${s.fase || via ? 'disabled' : ''}>${pul(q.opzioni[i])}</button>`;
     }).join('');
-    if (!s.fase && o && s.aiuti > 0 && !s.tolte) h += `<button class="viola" id="b-5050">✂️ Aiuto 50/50 <small>(ne hai ${s.aiuti})</small></button>`;
+    if (!s.fase && s.hint) h += `<div class="info">💬 ${s.hint}</div>`;
+    if (!s.fase && o && s.aiuti > 0 && (s.tolte || []).length < 2) h += `<button class="viola" id="b-5050">✂️ Aiuto 50/50 <small>(ne hai ${s.aiuti})</small></button>`;
+    if (!s.fase && o && !cieco && S.compagno && !s.chiesto && (s.tolte || []).length < 2) h += `<button class="grigio" id="b-chiedi">💬 Chiedi a ${amico()} <small>(una volta per lotta)</small></button>`;
     if (s.fase) h += `<button class="giallo" id="b-avanti">Avanti ▶</button>`;
   } else if (!s.fase) {
     if (q.tipo === 'orale') h += `<div class="info">Rispondi ad alta voce o nella tua testa, poi controlla.</div><button class="giallo" id="b-mostra">Mostra risposta</button>`;
@@ -467,7 +480,10 @@ function disegnaDomanda() {
   if ($('#b-mostra')) $('#b-mostra').onclick = gira;
   if ($('#b-si')) $('#b-si').onclick = () => esito(true);
   if ($('#b-no')) $('#b-no').onclick = () => esito(false);
-  if ($('#b-5050')) $('#b-5050').onclick = () => { s.aiuti--; s.tolte = mescola([0, 1, 2, 3].filter(i => i !== q.corretta)).slice(0, 2); suona('tap'); disegnaDomanda(); };
+  if ($('#b-chiedi')) $('#b-chiedi').onclick = () => {   // il compagno ti toglie una risposta sbagliata
+    s.chiesto = true; const via = [0, 1, 2, 3].filter(i => i !== q.corretta && !(s.tolte || []).includes(i));
+    s.tolte = [...(s.tolte || []), via[Math.floor(Math.random() * via.length)]]; s.hint = `${amico()}: «Questa no, ne sono sicuro!»`; M.amicoReagisce('punta'); suona('tap'); disegnaDomanda(); };
+  if ($('#b-5050')) $('#b-5050').onclick = () => { s.aiuti--; const t = s.tolte || []; s.tolte = [...t, ...mescola([0, 1, 2, 3].filter(i => i !== q.corretta && !t.includes(i))).slice(0, 2 - t.length)]; suona('tap'); disegnaDomanda(); };
   document.querySelectorAll('.opz').forEach(b => b.onclick = () => { s.scelta = +b.dataset.i; s.fase = 1; esito(s.scelta === q.corretta, true); });
   if ($('#b-avanti')) $('#b-avanti').onclick = avanti;
 }
@@ -479,6 +495,7 @@ function esito(ok, resta) {
     else { s.mio--; if (s.mio <= 0 && s.vite > 0) { s.vite--; s.mio = 1; s.msg = '💖 Seconda vita! Sei ancora in piedi.'; } }
   }
   if (!s.q.gen) rispondi(s.q, ok);
+  if (o && !o.cieco) M.amicoReagisce(ok ? 'felice' : 'triste');
   if (o && o.cieco) suona('tap'); else { M.reazione(ok); suona(ok ? 'ok' : 'ko'); }
   barraDuello();
   if (resta) { disegnaDomanda(); foglio.scrollTop = foglio.scrollHeight; } else avanti();
@@ -517,7 +534,7 @@ function fineSim() {
 function menu() {
   suona('tap'); sess = null; $('#duello').hidden = true; M.imposta('esplora');
   const opz = [['tutto', 'Tutti gli argomenti'], ['ripasso', `Da ripassare (${daRipassare()})`],
-    ...[1, 2, 3, 4, 5, 6, 7, 8].map(g => ['g' + g, `Giorno ${g}`]), ...CAPS.map(c => [c.id, c.titolo])];
+    ...[1, 2, 3, 4, 5, 6, 7, 8].map(g => ['g' + g, `🥊 ${CITTA[g].nome}`]), ...CAPS.map(c => [c.id, c.titolo])];
   const icona = L => L.id === 'biblio' ? '📚' : L.id === 'casa' ? '🏠' : L.id === 'esame' ? '📝' : S.medaglie[L.id] ? '🏅' : '⚔️';
   apri(`<div class="testa"><h2>Menu</h2>${M.ok ? '<button class="grigio x" id="b-x">✖</button>' : ''}</div>
     <h3>⚡ Studio rapido</h3>
@@ -526,8 +543,8 @@ function menu() {
       <button class="viola" data-mod="crocette">✅ Crocette</button><button class="giallo" data-mod="sim">📝 Esame</button></div>
     <button class="viola" id="b-speed">⚡ Speed round: 10 domande a tempo</button>
     <button class="verde" id="b-biblio">📚 Biblioteca: tutti gli argomenti (${ARG.filter(a => nStudio(a) > 0).length}/${ARG.length})</button>
-    ${M.ok ? '<h3>🗺 Vai da…</h3>' : '<h3>Sfide</h3>'}
-    ${LUOGHI.map(L => `<button class="vai ${L.id === 'esame' ? 'giallo' : L.id === 'casa' || L.id === 'biblio' ? 'grigio' : S.medaglie[L.id] ? 'verde' : ''}" data-vai="${L.id}">${icona(L)} ${L.giorno ? `Giorno ${L.giorno} · ${esc(L.prof)}` : esc(L.prof)}
+    ${M.ok ? `<h3>🗺 Vai da… <small>(solo dove sei già stato)</small></h3>` : '<h3>Sfide</h3>'}
+    ${LUOGHI.filter(L => !M.ok || S.visti[zonaL(L)]).map(L => `<button class="vai ${L.id === 'esame' ? 'giallo' : L.id === 'casa' || L.id === 'biblio' ? 'grigio' : S.medaglie[L.id] ? 'verde' : ''}" data-vai="${L.id}">${icona(L)} ${L.giorno ? `${esc(CITTA[L.giorno].nome)} · ${esc(L.prof)}` : esc(L.prof)}
       <small>${esc(L.nome)}${L.giorno ? ' · ' + CAPS.filter(c => c.giorno === L.giorno).map(c => esc(c.titolo.replace(/^Cap\. \d+ – /, ''))).join(', ') : ''}</small></button>`).join('')}
     <div class="riga"><button class="grigio" id="b-arm">👕 Armadio</button><button class="grigio" id="b-prog">📊 Progressi</button></div>
     <button class="grigio" id="b-snd">${S.sound ? '🔊 Suono: sì' : '🔇 Suono: no'}</button>`, true);
@@ -538,7 +555,7 @@ function menu() {
   $('#b-arm').onclick = armadio; $('#b-prog').onclick = progressi;
   $('#b-biblio').onclick = () => { foglio.hidden = true; teletrasporta('biblio'); entraBiblioteca(); };
   $('#b-speed').onclick = () => { const f = S.filtro, g = /^g\d$/.test(f) ? +f[1] : 0;
-    avviaSpeed(f === 'tutto' || f === 'ripasso' ? 'Tutto il programma' : g ? `Giorno ${g}` : CAPS.find(c => c.id === f).titolo,
+    avviaSpeed(f === 'tutto' || f === 'ripasso' ? 'Tutto il programma' : g ? CITTA[g].nome : CAPS.find(c => c.id === f).titolo,
       q => f === 'tutto' || f === 'ripasso' || (g ? q.giorno === g : q.id.startsWith(f)), f, chiudi); };
   $('#b-snd').onclick = () => { S.sound = !S.sound; save(); suona('tap'); $('#b-snd').textContent = S.sound ? '🔊 Suono: sì' : '🔇 Suono: no'; };
 }
@@ -604,7 +621,7 @@ function progressi() {
       return `<div class="${S.medaglie[l.id] ? '' : 'no'}"><span>🏅</span>G${l.giorno} · ${esc(l.nome)}<br>${p.v.map((b, k) => p.rip[k] ? '⚠️' : b ? '✅' : '⬜').join('')}</div>`; }).join('')}</div>
     <h3>✨ Evoluzione</h3>
     ${EVO.map(e => `<div class="card evo ${e.liv <= evo().liv ? '' : 'no'}"><b>Lv.${e.liv} ${e.nome}</b> <small>${e.xp} ⭐</small><br>❤️ ${e.hp} · ✂️ ${e.aiuti} aiuti 50/50 · 💖 ${e.vite} seconde vite${e.critico ? ' · 💥 colpo critico' : ''}</div>`).join('')}
-    <div class="card" style="margin-top:12px">📚 Argomenti studiati: <b>${ARG.filter(a => nStudio(a) > 0).length}/${ARG.length}</b> · ripassi <b>${ARG.reduce((t, a) => t + nStudio(a), 0)}/${ARG.length * 4}</b><br>
+    <div class="card" style="margin-top:12px">🗺 Città scoperte: <b>${Object.keys(S.visti).length}/${CITTA.length}</b> · 🧩 Rompicapi: <b>${Object.keys(S.enigmi).length}/${ENIGMI.length - 1}</b> · 💡 Lezioni: <b>${Object.keys(S.imparati).length}/${Object.keys(MONUMENTI).length}</b><br>📚 Argomenti studiati: <b>${ARG.filter(a => nStudio(a) > 0).length}/${ARG.length}</b> · ripassi <b>${ARG.reduce((t, a) => t + nStudio(a), 0)}/${ARG.length * 4}</b><br>
       🪙 Monete: <b>${S.monete}</b> · 💎 Look rari: <b>${Object.keys(S.looks).length}/${LOOKS.length}</b><br>Esame finale, miglior voto: <b>${S.voto ? (S.voto > 30 ? '30 e lode' : S.voto + '/30') : '—'}</b><br>
       Domande viste: <b>${Object.keys(S.srs).length}</b> su ${D.length}<br>Da ripassare: <b>${daRipassare()}</b><br>Padronanza totale: <b>${Math.round(padronanza(D) * 100)}%</b></div>
     <h3>Capitoli</h3>
@@ -656,7 +673,7 @@ function scaffali() {
     <div class="card">Studiati: <b>${fatti}/${ARG.length}</b> · Ripassi: <b>${ripassi}/${ARG.length * 4}</b>${sc ? `<br>⏰ Da ripassare oggi: <b>${sc}</b>` : ''}</div>
     ${[...new Set(ARG.map(a => a.cap))].map(cid => {
       const c = CAPS.find(x => x.id === cid), lib = ARG.map((a, i) => [a, i]).filter(([a]) => a.cap === cid);
-      return `<div class="scaffale"><div class="tit"><span>${esc(c ? c.titolo : 'Ripasso finale')}${c ? ` <small>· Giorno ${c.giorno}</small>` : ''}</span><b>${lib.filter(([a]) => nStudio(a)).length}/${lib.length}</b></div>
+      return `<div class="scaffale"><div class="tit"><span>${esc(c ? c.titolo : 'Ripasso finale')}${c ? ` <small>· ${esc(CITTA[c.giorno].nome)}</small>` : ''}</span><b>${lib.filter(([a]) => nStudio(a)).length}/${lib.length}</b></div>
         <div class="libri">${lib.map(([a, i]) => { const n = nStudio(a);
           return `<button class="libro l${n}" data-a="${i}"><span>${esc(a.titolo)}</span><i>${'●'.repeat(n)}${'○'.repeat(4 - n)}${scaduto(a) ? ' ⏰' : ''}</i></button>`; }).join('')}</div></div>`;
     }).join('')}
@@ -779,7 +796,7 @@ function fineIncontro(vinta, s) {
   } else {
     const r = ruba(I.furto);
     if (r) corpo = `<div class="big">🕵️</div><h2 style="text-align:center">Ti ha rubato una domanda!</h2>
-      <div class="info" style="text-align:center">L'ha portata a <b>${esc(r.nome)}</b>, nella palestra del <b>Giorno ${r.L.giorno}</b> (${esc(r.L.nome)}): −${r.xp} ⭐.<br>
+      <div class="info" style="text-align:center">L'ha portata a <b>${esc(r.nome)}</b>, nella palestra di <b>${esc(CITTA[r.L.giorno].nome)}</b> (${esc(r.L.nome)}): −${r.xp} ⭐.<br>
         Torna lì e battilo <b>senza errori</b> per riprenderla. Quale domanda fosse… dovrai scoprirlo rispondendo giusto a tutte.</div>`;
     else { const perse = Math.min(S.monete, I.posta); cambiaMonete(-I.posta);
       corpo = `<div class="big">💸</div><h2 style="text-align:center">Hai perso: −${perse} 🪙</h2>
@@ -862,82 +879,262 @@ function mostraSblocco(s) {
     fai: () => indossa(s.tipo, s.id, !foglio.hidden && !!foglio.querySelector('.skin')) });
 }
 
-// ---------- Minimappa: tocca per ingrandirla, poi tocca un posto e ci vai di corsa ----------
-const MAPPA = { x1: -21.5, x2: 21.5, z1: -73.5, z2: 46.5 }, mm = $('#mappa');
+// ---------- Il viaggio: compagno di studio, cittadine, monumenti, varchi e rompicapi ----------
+const AMICI = [
+  { corpo: '#ff8f3f', gambe: '#2b3a5a', stile: 'lunghi', capelli: '#8a4a1a', occhiali: '#2a2420', zaino: 1 },
+  { corpo: '#3fae6a', gambe: '#3a3a4a', stile: 'corti', capelli: '#1a1a1a', cuffie: 1, testa: 1 },
+  { corpo: '#b06bff', gambe: '#2a2a3a', stile: 'chignon', capelli: '#d9a441', libro: '#2f8a5a' },
+];
+const amico = () => esc(S.compagno || 'Il compagno');
+const fumettoAmico = html => `<div class="chi">💬 ${amico()} <small>· compagno di studio</small></div><div class="fumetto">${html}</div>`;
+function dice(html, ms) { toast(`<b>${amico()}:</b> ${html}`, ms); M.amicoReagisce('annuisce'); }
+const MONUMENTI = Object.fromEntries(CITTA.flatMap(c => c.luoghi || []).map(m => [m.id, m]));
+const monumento = id => MONUMENTI[id];
+function lezione(id) {   // il compagno ti spiega il monumento: la prima volta +5 ⭐
+  const m = monumento(id), prima = !S.imparati[id]; suona('tap');
+  if (prima) { S.imparati[id] = true; save(); aggiungiXP(5); }
+  apri(`<div class="chi">💡 ${esc(m.nome)}</div>${fumettoAmico(md(m.info))}
+    <div class="info">${prima ? '+5 ⭐ per la lezione' : 'Già sentita: ripassala quando vuoi.'} · Lezioni: <b>${Object.keys(S.imparati).length}/${Object.keys(MONUMENTI).length}</b></div>
+    <button class="giallo" id="b-ok">Grazie!</button>`);
+  $('#b-ok').onclick = chiudi;
+}
+// varco k: tra la città k e la k+1
+const statoLeve = {}, pedSeq = {}, errori = {};
+function varcoAperto(k) {
+  const E = ENIGMI[k];
+  if (E.tipo === 'medaglie') return LUOGHI.filter(l => l.giorno).every(l => S.medaglie[l.id]);
+  return !!S.enigmi[k] && (k === 0 || !!S.medaglie['g' + k]);
+}
+let apertiPrima = null;
+function aggiornaVarchi() {
+  const aperti = ENIGMI.map((_, k) => varcoAperto(k));
+  M.varchi(aperti);
+  if (apertiPrima) aperti.forEach((a, k) => { if (a && !apertiPrima[k]) { suona('vittoria'); dice(`Il <b>varco ${k + 1}</b> è aperto! Avanti verso <b>${esc(CITTA[k + 1].nome)}</b>.`, 6000); } });
+  apertiPrima = aperti;
+}
+function requisiti(k) {
+  const E = ENIGMI[k], r = [];
+  if (E.tipo === 'medaglie') return LUOGHI.filter(l => l.giorno).map(l => [!!S.medaglie[l.id], `Medaglia di ${CITTA[l.giorno].nome}`]);
+  if (k > 0) r.push([!!S.medaglie['g' + k], `Medaglia della palestra di ${CITTA[k].nome} (${LUOGO['g' + k].prof})`]);
+  r.push([!!S.enigmi[k], `Rompicapo: ${E.titolo}`]);
+  return r;
+}
+function parlaVarco(k) {
+  const E = ENIGMI[k]; suona('tap');
+  apri(`<div class="chi">🔒 Varco ${k + 1} <small>· verso ${esc(CITTA[k + 1].nome)}</small></div>
+    ${fumettoAmico(md(E.intro))}
+    <div class="card">${requisiti(k).map(([f, t]) => `${f ? '✅' : '⬜'} ${esc(t)}`).join('<br>')}</div>
+    ${E.tipo === 'leve' && !S.enigmi[k] ? '<button class="giallo" id="b-prova">🔓 Prova ad aprire con le leve</button>' : ''}
+    <button class="grigio" id="b-no">Ok</button>`);
+  $('#b-no').onclick = chiudi;
+  if ($('#b-prova')) $('#b-prova').onclick = () => provaLeve(k);
+}
+function parlaLeva(k, i) {
+  const E = ENIGMI[k], su = !!(statoLeve[k] || [])[i]; suona('tap');
+  apri(`<div class="chi">🎚 Leva ${i + 1} <small>· ${esc(E.titolo)}</small></div>
+    <div class="fumetto">«${esc(E.leve[i].t)}»</div>
+    <div class="info">Ora è <b>${su ? 'alzata (vera)' : 'abbassata (falsa)'}</b>. Alza solo le affermazioni vere, poi prova il varco.</div>
+    <div class="riga"><button class="rosso" id="b-giu">⬇ Falsa</button><button class="verde" id="b-su">⬆ Vera</button></div>`);
+  const metti = v => { (statoLeve[k] = statoLeve[k] || [])[i] = v; M.leva(k, i, v); suona('tap'); chiudi(); };
+  $('#b-su').onclick = () => metti(true); $('#b-giu').onclick = () => metti(false);
+}
+function provaLeve(k) {
+  const E = ENIGMI[k], st = statoLeve[k] || [], sbagliate = E.leve.map((l, i) => !!st[i] !== l.v ? i : -1).filter(i => i >= 0);
+  if (!sbagliate.length) return risolto(k);
+  errori[k] = (errori[k] || 0) + 1; suona('ko');
+  const l = E.leve[sbagliate[0]];
+  apri(`<div class="chi">🔒 Il varco non si apre</div>${fumettoAmico(`${sbagliate.length === 1 ? 'Una leva è' : `<b>${sbagliate.length}</b> leve sono`} nella posizione sbagliata.${errori[k] >= 2
+      ? `<br>Ti aiuto: guarda la <b>leva ${sbagliate[0] + 1}</b>. ${l.perche ? md(l.perche) : ''}` : ' Rileggile con calma.'}`)}
+    <button class="giallo" id="b-ok">Ok</button>`);
+  $('#b-ok').onclick = chiudi;
+}
+function pedanaPestata(k, i) {   // le pedane vanno pestate nell'ordine giusto
+  if (S.enigmi[k] || ENIGMI[k].tipo !== 'pedane' || !foglio.hidden) return;
+  const E = ENIGMI[k], n = pedSeq[k] || 0;
+  if (i === n) {
+    M.pedana(k, i, 'ok'); suona('ok'); pedSeq[k] = n + 1;
+    if (n + 1 === E.etichette.length) return risolto(k);
+    if (n === 0) dice(`Giusto, si parte da <b>${esc(E.etichette[0])}</b>. Ora la prossima…`);
+  } else {
+    pedSeq[k] = 0; errori[k] = (errori[k] || 0) + 1; suona('ko'); M.pedana(k, -1, 'ko'); setTimeout(() => !S.enigmi[k] && M.pedana(k, -1, 'off'), 700);
+    dice(errori[k] >= 2 ? md(E.aiuto) : `Ops, <b>${esc(E.etichette[i])}</b> non andava lì. Si ricomincia da capo!`, errori[k] >= 2 ? 9000 : 4500);
+  }
+}
+function sportello(k) {
+  const E = ENIGMI[k]; suona('tap');
+  if (S.enigmi[k]) { apri(`${fumettoAmico('Questo sportello l\'abbiamo già sistemato! ' + md(E.aiuto))}<button class="giallo" id="b-ok">Ok</button>`); $('#b-ok').onclick = chiudi; return; }
+  apri(`<div class="chi">🗂 ${esc(E.titolo)}</div><div class="fumetto">${md(E.intro)}</div>
+    ${E.voci.map((v, i) => `<label class="voce"><b>${esc(v)}</b><select data-v="${i}"><option value="">— scegli —</option>${E.scelte.map((c, j) => `<option value="${j}">${esc(c)}</option>`).join('')}</select></label>`).join('')}
+    <button class="giallo" id="b-consegna">📨 Consegna</button><button class="grigio" id="b-no">Più tardi</button>`, 'medio');
+  $('#b-no').onclick = chiudi;
+  $('#b-consegna').onclick = () => {
+    const r = [...foglio.querySelectorAll('select[data-v]')].map(x => x.value === '' ? -1 : +x.value);
+    const sbagliate = r.filter((x, i) => x !== E.giuste[i]).length;
+    if (!sbagliate) return risolto(k);
+    errori[k] = (errori[k] || 0) + 1; suona('ko');
+    foglio.querySelector('.esito-sportello')?.remove();
+    $('#b-consegna').insertAdjacentHTML('beforebegin', `<div class="card posta esito-sportello">${fumettoAmico(`${sbagliate === 1 ? 'Una risposta è sbagliata' : `<b>${sbagliate}</b> risposte sono sbagliate`}.${errori[k] >= 2 ? '<br>' + md(E.aiuto) : ' Riprova!'}`)}</div>`);
+  };
+}
+function risolto(k) {
+  S.enigmi[k] = true; save(); aggiungiXP(20); suona('vittoria'); M.vittoria(); mostraRisolto(k);
+  const manca = k > 0 && !S.medaglie['g' + k];
+  apri(`<div class="big">🧩</div><h2 style="text-align:center">${esc(ENIGMI[k].titolo)}: risolto!</h2>
+    ${fumettoAmico(`${manca ? `Bravissimo! Per aprire il varco serve ancora la <b>medaglia di ${esc(CITTA[k].nome)}</b>: batti il capopalestra ${esc(LUOGO['g' + k].prof)}.` : 'Grande! Il varco si apre.'}<br>${md(ENIGMI[k].aiuto || '')}`)}
+    <div class="info" style="text-align:center">+20 ⭐</div><button class="giallo" id="b-ok">Avanti!</button>`);
+  $('#b-ok').onclick = () => { chiudi(); aggiornaVarchi(); };
+}
+function mostraRisolto(k) {   // dopo un caricamento: pedane verdi e leve al posto giusto
+  const E = ENIGMI[k];
+  if (E.tipo === 'pedane') M.pedana(k, -1, 'ok');
+  if (E.tipo === 'leve') E.leve.forEach((l, i) => { M.leva(k, i, l.v); (statoLeve[k] = statoLeve[k] || [])[i] = l.v; });
+}
+// la prima volta in una cittadina il compagno te la presenta
+function controllaZona() {
+  if (!M.ok || !S.nome) return;
+  const z = M.dove().zona;
+  if (!S.visti[z] && !M.dove().stanza) { S.visti[z] = true; save(); aggiungiXP(10); dice(md(CITTA[z].amico), 9000); suona('evento'); }
+}
+function obiettivo() {   // cosa fare adesso, detto dal compagno
+  const k = ENIGMI.findIndex((_, i) => !varcoAperto(i));
+  if (k < 0) return S.voto ? 'Hai fatto tutto! Ripassa in biblioteca o rifai l\'esame per prendere 30 e lode.' : 'Tutti i varchi sono aperti: andiamo al <b>Rettorato</b> nella Città Universitaria per l\'esame finale!';
+  const E = ENIGMI[k];
+  if (E.tipo === 'medaglie') { const l = LUOGHI.find(x => x.giorno && !S.medaglie[x.id]); return `Per l'ultimo varco servono tutte le medaglie: ci manca quella di <b>${esc(CITTA[l.giorno].nome)}</b>.`; }
+  if (k > 0 && !S.medaglie['g' + k]) return `Dobbiamo battere la palestra di <b>${esc(CITTA[k].nome)}</b>: prima i due allenatori, poi il capopalestra <b>${esc(LUOGO['g' + k].prof)}</b>.`;
+  return `Sul percorso a nord di <b>${esc(CITTA[k].nome)}</b> c'è il rompicapo «${esc(E.titolo)}». ${md(E.intro)}`;
+}
+function parlaAmico() {
+  if (!S.nome) return presentazione();
+  suona('tap'); M.amicoReagisce('annuisce');
+  const z = M.ok ? M.dove().zona : 0, ms = (CITTA[z].luoghi || []).filter(m => !S.imparati[m.id]);
+  apri(`${fumettoAmico(`${obiettivo()}${ms.length ? `<br><br>💡 Qui a ${esc(CITTA[z].nome)} non hai ancora visto: <b>${ms.map(m => esc(m.nome)).join(', ')}</b>. Avvicinati e ti spiego!` : ''}`)}
+    <button class="giallo" id="b-ok">Ok, andiamo!</button>`);
+  $('#b-ok').onclick = chiudi;
+}
+function presentazione() {   // inizio del gioco: il tuo nome, il compagno e il suo aspetto
+  apri(`<h2>🎓 Benvenuto nella Città del Diritto!</h2>
+    <div class="info">Studierai Diritto Pubblico attraversando 10 cittadine. Non sarai da solo: c'è il tuo compagno di studio.</div>
+    <label class="voce"><b>Come ti chiami?</b><input id="in-nome" maxlength="20" autocomplete="off" placeholder="Il tuo nome" value="${esc(S.nome)}"></label>
+    <label class="voce"><b>Come si chiama il tuo compagno di studio?</b><input id="in-amico" maxlength="20" autocomplete="off" placeholder="Il suo nome" value="${esc(S.compagno)}"></label>
+    <h3>Che aspetto ha?</h3><div class="griglia3">${AMICI.map((a, i) => { const u = M.anteprimaPersona && M.anteprimaPersona(a, 'amico' + i);
+      return `<button class="scelta-amico ${(S.amico || 0) === i ? 'on' : ''}" data-a="${i}">${u ? `<img src="${u}" alt="">` : ['🧑‍🎓', '🎧', '📗'][i]}</button>`; }).join('')}</div>
+    <button class="giallo" id="b-via">Iniziamo! ▶</button>`, true);
+  document.querySelectorAll('.scelta-amico').forEach(b => b.onclick = () => { S.amico = +b.dataset.a; document.querySelectorAll('.scelta-amico').forEach(x => x.classList.toggle('on', x === b)); suona('tap'); });
+  $('#b-via').onclick = () => {
+    S.nome = ($('#in-nome').value.trim() || 'Studente').slice(0, 20); S.compagno = ($('#in-amico').value.trim() || 'Ale').slice(0, 20); save();
+    M.compagno(AMICI[S.amico || 0], S.compagno); chiudi(); suona('vittoria');
+    setTimeout(() => dice(`Ciao <b>${esc(S.nome)}</b>! Io sono <b>${amico()}</b>: studiamo insieme. ${md(CITTA[0].amico)} Se ti perdi tocca 💬 e ti dico cosa fare.`, 10000), 400);
+  };
+}
+
+// ---------- Minimappa: piccola = i dintorni; toccala e diventa la mappa del viaggio (viaggio rapido nelle città già visitate) ----------
+const mm = $('#mappa');
 function iconaLuogo(id) {
-  if (id === 'casa') return '👕'; if (id === 'biblio') return '📚'; if (id === 'esame') return '📝';
+  if (id === 'casa') return '👕'; if (id === 'biblio') return '📚'; if (id === 'esame') return '📝'; if (monumento(id)) return S.imparati[id] ? '' : '💡';
   const p = S.pal[id]; return p && p.rip.some(Boolean) ? '⚠️' : S.medaglie[id] ? '🏅' : '⚔️';
 }
+let nodiMappa = [];
 function disegnaMappa() {
-  const d = M.ok && M.dove(), vis = !!d && !d.stanza && foglio.hidden && $('#modal').hidden;
+  const d = M.ok && M.dove(), vis = !!d && !d.stanza && foglio.hidden && $('#modal').hidden && !!S.nome;
   mm.hidden = !vis; if (!vis) { mm.classList.remove('grande'); return; }
   const r = devicePixelRatio || 1, W = Math.round(mm.clientWidth * r), H = Math.round(mm.clientHeight * r);
   if (!W || !H) return;
   if (mm.width !== W || mm.height !== H) { mm.width = W; mm.height = H; }
-  const g = mm.getContext('2d'), sx = W / (MAPPA.x2 - MAPPA.x1), sz = H / (MAPPA.z2 - MAPPA.z1), grande = mm.classList.contains('grande');
-  const X = x => (x - MAPPA.x1) * sx, Z = z => (z - MAPPA.z1) * sz, cerchio = (x, z, rr) => { g.beginPath(); g.arc(X(x), Z(z), rr, 0, 7); g.fill(); };
+  const g = mm.getContext('2d'); g.textAlign = 'center'; g.textBaseline = 'middle';
+  if (mm.classList.contains('grande')) return disegnaViaggio(g, W, H, r, d);
+  // i dintorni: 54 m di larghezza, centrati su di te
+  const sx = W / 54, hz = H / sx, z1 = d.z - hz * 0.55, X = x => (x + 27) * sx, Z = z => (z - z1) * sx;
   g.fillStyle = '#62c34e'; g.fillRect(0, 0, W, H);
-  g.fillStyle = '#e3d6bb'; g.fillRect(X(-4), Z(-71), 8 * sx, 115 * sz); cerchio(0, 6, 7 * sx); g.fillRect(X(-10), Z(-61), 20 * sx, 12 * sz);
-  g.fillStyle = '#4fb4ff'; cerchio(0, 6, 2.8 * sx);
-  const f = Math.round((grande ? 18 : 11) * r);
-  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = '#e3d6bb'; g.fillRect(X(-4), 0, 8 * sx, H);
+  for (let k = 0; k < CITTA.length; k++) { const zc = -PASSO * k; g.beginPath(); g.arc(X(0), Z(zc + 4), 8 * sx, 0, 7); g.fill();
+    if (k < CITTA.length - 1) { g.fillStyle = '#3c9a3a'; g.fillRect(0, Z(zc - 68), X(-6.6), 41 * sx); g.fillRect(X(6.6), Z(zc - 68), W, 41 * sx); g.fillStyle = '#e3d6bb'; } }
   for (const p of M.pianta()) {
-    g.fillStyle = '#e3d6bb'; if (p.x) g.fillRect(Math.min(X(0), X(p.x)), Z(p.pz - 2.3), Math.abs(X(p.x) - X(0)), 3.4 * sz);
+    if (Math.abs(p.z - d.z) > hz) continue;
+    if (p.varco !== undefined) { g.fillStyle = varcoAperto(p.varco) ? '#3ec46d' : '#ef4f5f'; g.fillRect(X(-6.6), Z(p.z) - 1.5 * r, 13.2 * sx, 3 * r); continue; }
     g.fillStyle = p.col; g.strokeStyle = '#1d1b2e'; g.lineWidth = Math.max(1, r);
-    g.fillRect(X(p.x - p.w / 2), Z(p.z - p.d / 2), p.w * sx, p.d * sz); g.strokeRect(X(p.x - p.w / 2), Z(p.z - p.d / 2), p.w * sx, p.d * sz);
-    g.font = `${f}px sans-serif`; g.fillText(iconaLuogo(p.id), X(p.x), Z(p.z));
-    if (grande) { const L = LUOGO[p.id]; g.font = `900 ${Math.round(10 * r)}px sans-serif`; g.lineWidth = 3 * r; g.strokeStyle = '#fff'; g.fillStyle = '#1d1b2e';
-      const t = L.giorno ? `G${L.giorno} ${L.nome.split(' ')[0]}` : L.nome; g.strokeText(t, X(p.x), Z(p.z + p.d / 2) + 9 * r); g.fillText(t, X(p.x), Z(p.z + p.d / 2) + 9 * r); }
+    g.fillRect(X(p.x - p.w / 2), Z(p.z - p.d / 2), p.w * sx, p.d * sx); g.strokeRect(X(p.x - p.w / 2), Z(p.z - p.d / 2), p.w * sx, p.d * sx);
+    if (!p.casa) { g.font = `${Math.round(11 * r)}px sans-serif`; g.fillText(iconaLuogo(p.id), X(p.x), Z(p.z)); }
   }
-  if (d.ev) { g.fillStyle = '#b06bff'; cerchio(d.ev.x, d.ev.z, (4 + Math.sin(Date.now() / 150) * 1.5) * r * (grande ? 1.6 : 1)); }
-  g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = r; g.strokeRect(X(d.cx) - 7 * sx, Z(d.cz) - 9 * sz, 14 * sx, 18 * sz);   // cosa inquadri
-  const s = (grande ? 9 : 6) * r; g.save(); g.translate(X(d.x), Z(d.z)); g.rotate(-d.rot);
+  const zb = ENIGMI.findIndex((_, k) => !varcoAperto(k));   // oltre il primo varco chiuso: nebbia
+  if (zb >= 0) { const zz = Z(-PASSO * zb - 56); if (zz > 0) { g.fillStyle = 'rgba(29,27,46,.55)'; g.fillRect(0, 0, W, zz); } }
+  if (d.ev) { g.fillStyle = '#b06bff'; g.beginPath(); g.arc(X(d.ev.x), Z(d.ev.z), (4 + Math.sin(Date.now() / 150) * 1.5) * r, 0, 7); g.fill(); }
+  freccia(g, X(d.x), Z(d.z), d.rot, 6 * r, r);
+}
+function freccia(g, x, y, rot, s, r) {
+  g.save(); g.translate(x, y); g.rotate(-rot);
   g.beginPath(); g.moveTo(0, s); g.lineTo(-s * 0.75, -s * 0.65); g.lineTo(s * 0.75, -s * 0.65); g.closePath();
   g.fillStyle = '#ef4f5f'; g.strokeStyle = '#fff'; g.lineWidth = 2 * r; g.fill(); g.stroke(); g.restore();
 }
+function disegnaViaggio(g, W, H, r, d) {   // la mappa del viaggio: le cittadine in fila, dal borgo (in basso) all'università (in alto)
+  g.fillStyle = '#2f6b3a'; g.fillRect(0, 0, W, H);
+  const n = CITTA.length, pad = 26 * r, y = k => H - pad - k * (H - 2 * pad) / (n - 1), cx = W * 0.22;
+  g.strokeStyle = '#e3d6bb'; g.lineWidth = 6 * r; g.beginPath(); g.moveTo(cx, y(0)); g.lineTo(cx, y(n - 1)); g.stroke();
+  nodiMappa = [];
+  for (let k = 0; k < n; k++) {
+    const visto = !!S.visti[k], C = CITTA[k], qui = d.zona === k;
+    if (k < n - 1) { const ym = (y(k) + y(k + 1)) / 2; g.font = `${Math.round(13 * r)}px sans-serif`; g.fillText(varcoAperto(k) ? '🔓' : '🔒', cx, ym); }
+    g.fillStyle = visto ? C.colore : '#5a6a5a'; g.strokeStyle = qui ? '#ffd23f' : '#1d1b2e'; g.lineWidth = (qui ? 5 : 3) * r;
+    g.beginPath(); g.arc(cx, y(k), 13 * r, 0, 7); g.fill(); g.stroke();
+    g.textAlign = 'left'; g.fillStyle = '#ffffff'; g.font = `900 ${Math.round(13 * r)}px sans-serif`;
+    const pal = C.palestra, icona = pal ? (S.medaglie[pal] ? ' 🏅' : '') : '';
+    g.fillText(visto ? C.nome + icona : '???', cx + 22 * r, y(k) - 6 * r);
+    g.font = `700 ${Math.round(10 * r)}px sans-serif`; g.fillStyle = 'rgba(255,255,255,.8)';
+    g.fillText(qui ? 'sei qui' : visto ? 'tocca: viaggio rapido' : 'non ancora scoperta', cx + 22 * r, y(k) + 9 * r);
+    g.textAlign = 'center';
+    nodiMappa.push({ k, y: y(k) / H });
+  }
+}
 mm.addEventListener('click', e => {
   if (!mm.classList.contains('grande')) { suona('tap'); mm.classList.add('grande'); return disegnaMappa(); }
-  const b = mm.getBoundingClientRect(), x = MAPPA.x1 + (e.clientX - b.left) / b.width * (MAPPA.x2 - MAPPA.x1), z = MAPPA.z1 + (e.clientY - b.top) / b.height * (MAPPA.z2 - MAPPA.z1);
-  const vicini = M.pianta().map(p => [p, Math.hypot(p.x - x, p.z - z) - Math.max(p.w, p.d) / 2]).sort((a, c) => a[1] - c[1]);
+  const b = mm.getBoundingClientRect(), fy = (e.clientY - b.top) / b.height;
+  const nodo = nodiMappa.reduce((m, n) => Math.abs(n.y - fy) < Math.abs(m.y - fy) ? n : m, nodiMappa[0]);
   mm.classList.remove('grande'); suona('tap');
-  if (vicini.length && vicini[0][1] < 3) M.vai(vicini[0][0].id); else M.vaiA(x, z);
+  if (nodo && Math.abs(nodo.y - fy) < 0.06 && S.visti[nodo.k] && M.dove().zona !== nodo.k) { palAtt = null; M.vaiCitta(nodo.k); segni(); }
 });
 document.addEventListener('pointerdown', e => { if (mm.classList.contains('grande') && e.target !== mm) mm.classList.remove('grande'); }, true);
-setInterval(disegnaMappa, 150);
+setInterval(() => { disegnaMappa(); controllaZona(); }, 150);
 
 // ---------- Avvio ----------
 load();
 if (!SKIN_BOY.some(s => s.id === S.boy)) S.boy = 'felpa';
 if (!TEMI.some(t => t.id === S.tema)) S.tema = 'giorno';
 while (S.evo < EVO.length - 1 && S.xp >= EVO[S.evo + 1].xp) S.evo++;   // salvataggi vecchi: evoluzione in silenzio
+if (S.mondo !== 2) { S.pos = null; S.mondo = 2; S.visti = { 0: true }; S.zoom = Math.max(S.zoom, 1.8); save(); }   // la mappa è diventata grande: si riparte dal borgo (medaglie e punti restano)
 const ha3D = M.init($('#mondo'), {
-  joy: $('#joy'), onParla: parla, onVicino: mostraAzione, onCammino: cammino, zoom: S.zoom,
+  joy: $('#joy'), onParla: parla, onVicino: mostraAzione, onCammino: cammino, onPedana: pedanaPestata, zoom: S.zoom,
   onZoom: z => { S.zoom = Math.round(z * 100) / 100; clearTimeout(window.__z); window.__z = setTimeout(save, 400); },
   onMossa: () => { $('#aiuto').hidden = true; if (S.aiuto) { S.aiuto = false; save(); } },
 });
 if (ha3D) {
-  M.vestito(S.boy, lookAttuale()); M.zoomA(S.zoom); M.costruisci(LUOGHI, S.boy); M.costruisciSala(ARG, NOMI_SCAFFALI); M.costruisciPalestra(); M.libri(ARG.map(nStudio));
+  M.vestito(S.boy, lookAttuale()); M.zoomA(S.zoom); M.costruisci(LUOGHI, CITTA, S.boy); M.costruisciSala(ARG, NOMI_SCAFFALI); M.costruisciPalestra(); M.libri(ARG.map(nStudio));
+  ENIGMI.forEach((E, k) => E.tipo !== 'medaglie' && M.enigma(k, E.tipo === 'leve' ? { tipo: 'leve', n: E.leve.length } : E.tipo === 'pedane' ? { tipo: 'pedane', etichette: E.etichette } : { tipo: 'sportello', insegna: E.insegna }));
+  ENIGMI.forEach((_, k) => S.enigmi[k] && mostraRisolto(k)); aggiornaVarchi();
+  if (S.nome) M.compagno(AMICI[S.amico || 0], S.compagno);
   M.tema(S.tema); segni();
   if (S.pos) M.mettiA(S.pos[0], S.pos[1]);
   addEventListener('pagehide', salvaPos); document.addEventListener('visibilitychange', () => document.hidden && salvaPos());
 } else document.body.classList.add('no3d');
 reddito(true); setInterval(reddito, 20000);
 aggiornaHUD();
-$('#b-menu').onclick = menu;
+$('#b-menu').onclick = menu; $('#b-amico').onclick = parlaAmico;
 $('#azione').onclick = () => vicinoId && parla(vicinoId);
 if (S.aiuto && ha3D) $('#aiuto').hidden = false;
 // indirizzi diretti (comodi per i test): #tema-notte, #menu, #mappa, #sim, #palestra-g1, #lotta-g1, #capo-g1, #parla-g3, #incontro, #zoom-4
 const H = location.hash.slice(1);
+if (H && !S.nome && ha3D) { S.nome = 'Giotto'; S.compagno = 'Ale'; M.compagno(AMICI[0], S.compagno); }   // indirizzi di prova: un compagno finto (non salvato finché non giochi)
 const rotte = { menu, armadio, progressi, sim: avviaSim, biblioteca: () => { teletrasporta('biblio'); entraBiblioteca(); }, libro: () => { teletrasporta('biblio'); entraBiblioteca(); lettura(1); },
-  speed: () => avviaSpeed('Giorno 3', q => q.giorno === 3, 'g3', chiudi),
+  speed: () => avviaSpeed('Roma dei Palazzi', q => q.giorno === 3, 'g3', chiudi),
   mappa: () => setTimeout(() => { mm.classList.add('grande'); disegnaMappa(); }, 200),
-  incontro: () => { teletrasporta('g1'); M.mettiA(0, 24); const t = INCONTRI[5]; if (M.evento(t.persona, t.nome)) { incontro = { tipo: t, nato: Date.now() }; parlaIncontro(); } }, orale: () => avvia('orale'), flashcard: () => avvia('flashcard'), crocette: () => avvia('crocette') };
+  incontro: () => { teletrasporta('casa'); M.mettiA(0, 14); const t = INCONTRI[5]; if (M.evento(t.persona, t.nome)) { incontro = { tipo: t, nato: Date.now() }; parlaIncontro(); } }, orale: () => avvia('orale'), flashcard: () => avvia('flashcard'), crocette: () => avvia('crocette') };
 if (rotte[H]) rotte[H]();
 else if (/^zoom-/.test(H)) M.zoomA(+H.slice(5));
+else if (/^citta-\d/.test(H)) { M.vaiCitta(+H[6]); if (H.includes('z')) M.zoomA(+H.split('z')[1]); }   // es. #citta-8 o #citta-3z3
+else if (/^strada-\d/.test(H)) M.mettiA(0, -PASSO * +H[7] - 28);   // davanti al rompicapo del percorso
 else if (/^tema-/.test(H)) { M.tema(H.slice(5)); teletrasporta('g3'); }   // anteprima di un'ambientazione (non salvata)
 else if (/^(palestra|lotta|capo|parla)-/.test(H)) { const [r, id] = H.split('-'); teletrasporta(id);
   if (r === 'parla') parla(id); else { entraPalestra(id); if (r === 'lotta') lottaAllenatore(0); if (r === 'capo') lottaCapo(); } }
 else if (!ha3D) menu();
+else if (!S.nome && !location.search.includes('test')) presentazione();   // primo avvio: nome e compagno
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   if (navigator.serviceWorker.controller) navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
   navigator.serviceWorker.register('sw.js').catch(() => { });
@@ -1022,12 +1219,48 @@ if (location.search.includes('test')) {
     avviaSim(); giri = 0; while (sess && giri++ < 20) risp(true);
     ok(giri === 10 && foglio.innerHTML.includes('30 e lode') && S.voto === 31, 'esame perfetto = 30 e lode');
     pulisciCoda();
-    menu(); document.querySelector('[data-vai="g3"]').click(); ok(foglio.innerHTML.includes('Camerini') && foglio.innerHTML.includes('Entra in palestra'), 'vai da… apre la palestra');
+    S.visti = { 0: true }; menu(); ok(!document.querySelector('[data-vai="g3"]') || !M.ok, 'vai da…: solo le città già visitate');
+    S.visti = Object.fromEntries(CITTA.map((_, k) => [k, true])); menu(); document.querySelector('[data-vai="g3"]').click(); ok(foglio.innerHTML.includes('Camerini') && foglio.innerHTML.includes('Entra in palestra'), 'vai da… apre la palestra');
     avvia('orale'); $('#b-mostra').click(); $('#b-si').click(); avvia('flashcard'); $('#carta').click(); $('#b-no').click();
     avvia('crocette'); document.querySelector('.opz').click(); $('#b-avanti').click(); $('#b-fine').click();
     armadio(); progressi(); parla('esame'); parla('casa'); chiudi();
-    if (M.ok) { const p = M.percorso(-8, 39.6, 12, -44 + 3 + 2 + 2.2 + 1.9), f = p && p[p.length - 1];
-      ok(p && p.length > 1 && Math.hypot(f.x - 12, f.z - (-44 + 9.1)) < 1.5, 'percorso dalla partenza al Tribunale'); }
+    if (M.ok) {
+      M.varchi([]); const p = M.percorso(2, 20, 13, 20.1), f = p && p[p.length - 1];
+      ok(p && p.length >= 1 && Math.hypot(f.x - 13, f.z - 20.1) < 1.2, 'percorso dalla partenza alla biblioteca');
+      const q = M.percorso(2, 20, 0, -PASSO + 14), g = q && q[q.length - 1];
+      ok(g && g.z > -57, 'varco chiuso: non si passa');
+      M.varchi([true]); const r = M.percorso(2, 20, 0, -PASSO + 14), h = r && r[r.length - 1];
+      ok(h && Math.hypot(h.x, h.z - (-PASSO + 14)) < 1.2, 'varco aperto: si arriva a Città di Confine');
+    }
+    // varchi e rompicapi
+    Object.assign(S, { enigmi: {}, medaglie: {} }); apertiPrima = null; aggiornaVarchi();
+    ok(!varcoAperto(0), 'varco 1 chiuso all\'inizio');
+    ENIGMI[0].leve.forEach((l, i) => { parlaLeva(0, i); $(l.v ? '#b-su' : '#b-giu').click(); });
+    parlaVarco(0); $('#b-prova').click(); ok(S.enigmi[0] && varcoAperto(0), 'leve giuste: varco 1 aperto'); $('#b-ok').click();
+    statoLeve[3] = []; parlaVarco(3); $('#b-prova').click(); ok(!S.enigmi[3] && foglio.innerHTML.includes('sbagliat'), 'leve sbagliate: il varco resta chiuso'); chiudi();
+    pedanaPestata(1, 1); ok(!pedSeq[1], 'pedana sbagliata: si ricomincia');
+    ENIGMI[1].etichette.forEach((_, i) => pedanaPestata(1, i)); ok(S.enigmi[1] && !varcoAperto(1), 'pedane in ordine: risolto, ma serve la medaglia'); chiudi();
+    S.medaglie.g1 = true; aggiornaVarchi(); ok(varcoAperto(1), 'con la medaglia il varco 2 si apre');
+    sportello(6); ENIGMI[6].giuste.forEach((g, i) => { foglio.querySelector(`select[data-v="${i}"]`).value = String(g); }); $('#b-consegna').click();
+    ok(S.enigmi[6], 'sportello dell\'art. 117 risolto'); chiudi();
+    sportello(5); $('#b-consegna').click(); ok(!S.enigmi[5] && foglio.innerHTML.includes('sbagliate'), 'sportello lasciato vuoto: risposte sbagliate'); chiudi();
+    ok(!varcoAperto(8), 'varco del Rettorato chiuso senza 8 medaglie');
+    LUOGHI.filter(l => l.giorno).forEach(l => { S.medaglie[l.id] = true; }); ok(varcoAperto(8), '8 medaglie: varco del Rettorato aperto');
+    ok(ENIGMI.length === CITTA.length - 1 && ENIGMI.every(E => E.tipo === 'medaglie' || E.intro), 'un rompicapo per ogni percorso');
+    // lezioni dei monumenti
+    S.xp = 0; S.imparati = {}; lezione('m-carcere');
+    ok(S.imparati['m-carcere'] && S.xp === 5 && foglio.innerHTML.includes('rieducazione'), 'lezione del carcere: +5 ⭐');
+    lezione('m-carcere'); ok(S.xp === 5, 'la lezione si paga una volta sola'); chiudi();
+    ok(CITTA.every((c, k) => k === 0 || (c.luoghi || []).length), 'ogni cittadina ha i suoi monumenti');
+    // presentazione e compagno di studio
+    S.nome = ''; presentazione(); $('#in-nome').value = 'Giulia'; $('#in-amico').value = '<b>Marco</b>';
+    document.querySelector('.scelta-amico[data-a="2"]').click(); $('#b-via').click();
+    ok(S.nome === 'Giulia' && S.compagno === '<b>Marco</b>' && S.amico === 2 && amico() === '&lt;b&gt;Marco&lt;/b&gt;', 'presentazione: nome, compagno (testo ripulito) e aspetto');
+    ok(pulito({ nome: 'x'.repeat(50) }).nome.length === 20, 'nome lungo tagliato');
+    parlaAmico(); ok(foglio.innerHTML.includes('compagno di studio'), 'il compagno ti dice cosa fare'); chiudi();
+    entraPalestra('g1'); lottaAllenatore(0); $('#b-chiedi').click();
+    ok(sess.tolte.length === 1 && sess.chiesto && !$('#b-chiedi') && foglio.querySelectorAll('.opz:disabled').length === 1, 'chiedi al compagno: una risposta sbagliata in meno');
+    fineLotta(true); esciPalestra();
     // biblioteca
     ok(ARG.length > 90 && ARG.every(a => a.html && a.titolo), 'biblioteca: più di 90 libri con testo');
     Object.assign(S, { xp: 0, studio: {} }); entraBiblioteca(); ok(foglio.querySelectorAll('.libro[data-a]').length === ARG.length, 'biblioteca: un libro per argomento');

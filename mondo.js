@@ -9,7 +9,7 @@ const clock = new THREE.Clock();
 const NPC = new Map();                 // id luogo -> { P, x, z, etichetta, segno }
 const OSTACOLI = [];                   // {x1,x2,z1,z2} oppure {x,z,r}
 const LIM = { x1: -19.5, x2: 19.5, z1: -71, z2: 44 };
-const G = { x: -8, z: 39.6, rot: Math.PI, dest: null, seg: null, path: null, corsa: false, fermo: 0, P: null };
+const G = { x: 2, z: 20, rot: Math.PI, dest: null, seg: null, path: null, corsa: false, fermo: 0, P: null };
 let stacco = false, modo = 'esplora', fuoco = null, spazio = 0, spazioSu = 0, vicino = null, temaAtt = null;
 let stanza = null;                     // null = in città · 'sala' = biblioteca · 'palestra'
 const AZ = 170, LIM_P = { x1: -5.4, x2: 5.4, z1: AZ - 8.8, z2: AZ + 9.6 };   // la palestra sta lontano, a sud
@@ -91,7 +91,10 @@ function bandiera(statico, tipo, x, y, z, sc = 1) {
   statico.add(cil(0.05 * sc, 0.05 * sc, 3 * sc, '#d0d0d8', x, y + 1.5 * sc, z, 6));
   statico.add(sfera(0.09 * sc, '#d4af37', x, y + 3.05 * sc, z, 0, 8));
   const c = document.createElement('canvas'); c.width = 96; c.height = 64; const k = c.getContext('2d');
-  if (tipo === 'it') ['#1f9e4a', '#ffffff', '#d32f2f'].forEach((col, i) => { k.fillStyle = col; k.fillRect(i * 32, 0, 32, 64); });
+  const RIGHE = { it: ['#1f9e4a', '#ffffff', '#d32f2f'], fr: ['#1d3f99', '#ffffff', '#d32f2f'], ie: ['#1f9e4a', '#ffffff', '#f08a24'] },
+    FASCE = { de: ['#151515', '#d32f2f', '#ffcf33'], at: ['#d32f2f', '#ffffff', '#d32f2f'], nl: ['#d32f2f', '#ffffff', '#1d3f99'] };
+  if (RIGHE[tipo]) RIGHE[tipo].forEach((col, i) => { k.fillStyle = col; k.fillRect(i * 32, 0, 32, 64); });
+  else if (FASCE[tipo]) FASCE[tipo].forEach((col, i) => { k.fillStyle = col; k.fillRect(0, i * 22, 96, 22); });
   else { k.fillStyle = '#1d3f99'; k.fillRect(0, 0, 96, 64); k.fillStyle = '#ffd23f';
     for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; k.beginPath(); k.arc(48 + Math.cos(a) * 20, 32 + Math.sin(a) * 20, 3.4, 0, 7); k.fill(); } }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
@@ -110,93 +113,105 @@ function sventola(t) {
 
 // ---------- Personaggi (stile chibi: testa grande) ----------
 const PELLE = '#f6c7a1';
+function capsula(r, len, c, x, y, z, t = 0) {
+  const o = mesh(geo(`k${r},${len}`, () => new THREE.CapsuleGeometry(r, len, 5, 14)), c, x, y, z);
+  if (t) { const b = new THREE.Mesh(o.geometry, BORDO); b.scale.set(1 + t / r, 1 + t / (r + len / 2), 1 + t / r); o.add(b); }
+  return o;
+}
+// Personaggi chibi tondi: testa grande, corpo a capsula, occhioni. Cappelli e accessori stanno nel gruppo H
+// (coordinate "vecchie" della testa, ingrandite: così tutti i look restano allineati).
 function persona(a) {
   const g = new THREE.Group(), p = {};
   const capelli = a.capelli || '#4a2d16';
   for (const s of [-1, 1]) {
-    const anca = new THREE.Group(); anca.position.set(s * 0.17, 0.62, 0); g.add(anca);
-    anca.add(box(0.24, 0.5, 0.26, a.gambe || '#2b3a5a', 0, -0.27, 0, 0.025));
-    anca.add(box(0.27, 0.13, 0.36, a.scarpe || '#2a2420', 0, -0.555, 0.04, 0.025));
+    const anca = new THREE.Group(); anca.position.set(s * 0.14, 0.42, 0); g.add(anca);
+    anca.add(capsula(0.12, 0.16, a.gambe || '#2b3a5a', 0, -0.18, 0, 0.022));
+    const pie = sfera(0.14, a.scarpe || '#2a2420', 0, -0.36, 0.05, 0.022, 12); pie.scale.set(1, 0.62, 1.35); anca.add(pie);
     p[s < 0 ? 'gS' : 'gD'] = anca;
   }
-  if (a.toga) g.add(box(0.82, 0.5, 0.52, a.toga, 0, 0.42, 0, 0.025));
-  const busto = new THREE.Group(); busto.position.y = 0.62; g.add(busto); p.busto = busto;
-  busto.add(box(0.74, 0.64, 0.44, a.corpo, 0, 0.32, 0, 0.03));
+  if (a.toga) g.add(cil(0.34, 0.5, 0.62, a.toga, 0, 0.36, 0, 18, 0.025));
+  const busto = new THREE.Group(); busto.position.y = 0.42; g.add(busto); p.busto = busto; p.by = 0.42;
+  busto.add(capsula(0.3, 0.3, a.corpo, 0, 0.38, 0, 0.03));
   for (const s of [-1, 1]) {
-    const spalla = new THREE.Group(); spalla.position.set(s * 0.48, 0.58, 0); busto.add(spalla);
-    spalla.add(box(a.toga ? 0.26 : 0.2, 0.5, a.toga ? 0.28 : 0.22, a.maniche || a.corpo, 0, -0.22, 0, 0.025));
-    spalla.add(sfera(0.12, PELLE, 0, -0.52, 0, 0.02, 10));
+    const spalla = new THREE.Group(); spalla.position.set(s * 0.36, 0.62, 0); busto.add(spalla);
+    spalla.add(capsula(a.toga ? 0.12 : 0.095, 0.22, a.maniche || a.corpo, 0, -0.17, 0, 0.022));
+    spalla.add(sfera(0.11, PELLE, 0, -0.38, 0, 0.02, 12));
     p[s < 0 ? 'bS' : 'bD'] = spalla;
   }
-  // dettagli del vestito, davanti al petto (z = 0.22)
-  const F = 0.225;
-  if (a.camicia) busto.add(box(0.26, 0.5, 0.02, '#ffffff', 0, 0.36, F));
-  if (a.cravatta) busto.add(box(0.1, 0.42, 0.03, a.cravatta, 0, 0.34, F + 0.015));
-  if (a.cappuccio) { busto.add(box(0.56, 0.26, 0.2, a.corpo, 0, 0.6, -0.26, 0.02)); for (const s of [-1, 1]) busto.add(box(0.03, 0.2, 0.02, '#ffffff', s * 0.09, 0.45, F)); }
-  if (a.bavaglino) for (const s of [-1, 1]) busto.add(box(0.07, 0.2, 0.02, '#ffffff', s * 0.05, 0.5, F));
-  if (a.cordoni) for (const s of [-1, 1]) busto.add(box(0.045, 0.6, 0.02, a.cordoni, s * 0.26, 0.32, F));
-  if (a.collare) busto.add(box(0.78, 0.13, 0.48, a.collare, 0, 0.6, 0));
+  // vestito, sul davanti del corpo (z ≈ 0.3)
+  if (a.camicia) busto.add(box(0.24, 0.36, 0.04, '#ffffff', 0, 0.5, 0.285));
+  if (a.cravatta) busto.add(box(0.09, 0.32, 0.04, a.cravatta, 0, 0.47, 0.305));
+  if (a.cappuccio) { const c = sfera(0.2, a.corpo, 0, 0.78, -0.2, 0.02, 12); c.scale.set(1.6, 0.7, 1); busto.add(c);
+    for (const s of [-1, 1]) busto.add(box(0.03, 0.18, 0.02, '#ffffff', s * 0.08, 0.6, 0.29)); }
+  if (a.bavaglino) for (const s of [-1, 1]) busto.add(box(0.06, 0.16, 0.03, '#ffffff', s * 0.045, 0.68, 0.29));
+  if (a.cordoni) for (const s of [-1, 1]) busto.add(box(0.04, 0.5, 0.03, a.cordoni, s * 0.2, 0.45, 0.235));
+  if (a.collare) { const c = mesh(geo('collare', () => new THREE.TorusGeometry(0.28, 0.08, 8, 20)), a.collare, 0, 0.76, 0); c.rotation.x = Math.PI / 2; busto.add(c); }
   if (a.fascia) ['#1f9e4a', '#ffffff', '#d32f2f'].forEach((col, i) => {
-    const f = box(0.075, 0.95, 0.02, col, -0.03 + (i - 1) * 0.065, 0.32, F + 0.02); f.rotation.z = 0.78; busto.add(f); });
+    const f = box(0.07, 0.75, 0.03, col, -0.03 + (i - 1) * 0.065, 0.45, 0.3); f.rotation.z = 0.78; busto.add(f); });
   if (a.coccarda) [['#1f9e4a', 0.09], ['#ffffff', 0.062], ['#d32f2f', 0.034]].forEach(([col, r], i) => {
-    const c = cil(r, r, 0.02, col, 0.2, 0.46, F + 0.01 + i * 0.008, 14); c.rotation.x = Math.PI / 2; busto.add(c); });
-  if (a.libro) { const l = box(0.3, 0.38, 0.1, a.libro, 0, -0.5, 0.12, 0.02); p.bS.add(l); }
+    const c = cil(r, r, 0.02, col, 0.16, 0.6, 0.27 + i * 0.008, 14); c.rotation.x = Math.PI / 2; busto.add(c); });
+  if (a.libro) p.bS.add(box(0.3, 0.38, 0.1, a.libro, 0, -0.42, 0.14, 0.02));
+  if (a.mantello) ['#1f9e4a', '#ffffff', '#d32f2f'].forEach((col, i) => busto.add(box(0.22, 0.9, 0.04, col, (i - 1) * 0.22, 0.35, -0.31, 0.015)));
+  if (a.zaino) { busto.add(box(0.46, 0.5, 0.22, '#f08a24', 0, 0.45, -0.38, 0.025)); busto.add(box(0.32, 0.18, 0.06, '#c96a14', 0, 0.32, -0.5));
+    for (const s of [-1, 1]) busto.add(box(0.05, 0.44, 0.02, '#c96a14', s * 0.17, 0.5, 0.29)); }
   // testa
-  const T = new THREE.Group(); T.position.y = 0.64; busto.add(T); p.testa = T;
-  T.add(sfera(0.47, PELLE, 0, 0.42, 0, 0.03, 20));
+  const T = new THREE.Group(); T.position.y = 0.8; busto.add(T); p.testa = T;
+  T.add(sfera(0.52, PELLE, 0, 0.45, 0, 0.03, 24));
   p.occhi = [-1, 1].map(s => {
-    const o = sfera(0.075, '#1c1830', s * 0.165, 0.44, 0.415, 0, 10); o.scale.set(1, 1.4, 0.55); T.add(o);
-    T.add(mesh(geo('luce', () => new THREE.SphereGeometry(0.026, 6, 4)), BIANCO, s * 0.165 + 0.025, 0.48, 0.452));
+    const o = sfera(0.085, '#1c1830', s * 0.19, 0.47, 0.45, 0, 12); o.scale.set(1, 1.35, 0.55); o.userData.sy = 1.35; T.add(o);
+    T.add(mesh(geo('luce', () => new THREE.SphereGeometry(0.03, 6, 4)), BIANCO, s * 0.19 + 0.03, 0.53, 0.5));
     return o;
   });
-  for (const s of [-1, 1]) { const gu = sfera(0.07, '#ff9e9e', s * 0.29, 0.33, 0.37, 0, 8); gu.scale.set(1, 0.6, 0.35); T.add(gu); }
-  p.bocca = box(0.13, 0.04, 0.04, '#7a2a2a', 0, 0.28, 0.44); T.add(p.bocca);
+  for (const s of [-1, 1]) { const gu = sfera(0.08, '#ff9e9e', s * 0.32, 0.33, 0.39, 0, 8); gu.scale.set(1, 0.6, 0.35); T.add(gu); }
+  p.bocca = mesh(geo('bocca', () => new THREE.TorusGeometry(0.065, 0.02, 6, 12, Math.PI)), '#7a2a2a', 0, 0.3, 0.5); p.bocca.rotation.z = Math.PI; p.bocca.castShadow = false; T.add(p.bocca);
+  const H = new THREE.Group(); H.position.y = -0.0145; H.scale.setScalar(1.106); T.add(H);   // capelli e accessori
   const st = a.stile || 'corti';
   if (st === 'calvo') {
-    for (const s of [-1, 1]) T.add(sfera(0.15, capelli, s * 0.43, 0.44, -0.08, 0.02, 10));
-    T.add(box(0.62, 0.22, 0.2, capelli, 0, 0.36, -0.38, 0.02));
+    for (const s of [-1, 1]) H.add(sfera(0.15, capelli, s * 0.43, 0.44, -0.08, 0.02, 10));
+    const d = sfera(0.3, capelli, 0, 0.36, -0.3, 0.02, 12); d.scale.set(1.2, 0.5, 0.6); H.add(d);
   } else {
-    const cap = mesh(geo('capelli', () => new THREE.SphereGeometry(0.505, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.47)), capelli, 0, 0.42, -0.02);
-    cap.rotation.x = -0.18; cap.add(contorno(cap, 1.06));
-    T.add(cap); T.add(box(0.58, 0.12, 0.14, capelli, 0, 0.62, 0.39));
-    if (st === 'lunghi') T.add(box(0.86, 0.72, 0.32, capelli, 0, 0.24, -0.22, 0.025));
-    if (st === 'chignon') T.add(sfera(0.18, capelli, 0, 0.86, -0.3, 0.02, 10));
+    const cap = mesh(geo('capelli', () => new THREE.SphereGeometry(0.505, 22, 11, 0, Math.PI * 2, 0, Math.PI * 0.47)), capelli, 0, 0.42, -0.02);
+    cap.rotation.x = -0.18; cap.add(contorno(cap, 1.06)); H.add(cap);
+    for (const [x, y, z] of [[-0.2, 0.62, 0.33], [0, 0.66, 0.37], [0.2, 0.62, 0.33]]) H.add(sfera(0.13, capelli, x, y, z, 0, 10));
+    if (st === 'lunghi') { const l = sfera(0.42, capelli, 0, 0.2, -0.25, 0.025, 14); l.scale.set(1.1, 1, 0.6); H.add(l); }
+    if (st === 'chignon') H.add(sfera(0.18, capelli, 0, 0.86, -0.3, 0.02, 10));
   }
-  if (a.barba) { const b = sfera(0.3, a.barba, 0, 0.2, 0.2, 0.02, 12); b.scale.set(1.25, 0.72, 0.9); T.add(b); }
+  if (a.barba) { const b = sfera(0.3, a.barba, 0, 0.2, 0.2, 0.02, 12); b.scale.set(1.25, 0.72, 0.9); H.add(b); }
   if (a.occhiali && !a.sole) {
-    for (const s of [-1, 1]) { const o = mesh(geo('lente', () => new THREE.TorusGeometry(0.115, 0.026, 6, 16)), a.occhiali, s * 0.165, 0.45, 0.46); o.castShadow = false; T.add(o); }
-    T.add(box(0.1, 0.025, 0.02, a.occhiali, 0, 0.47, 0.47));
+    for (const s of [-1, 1]) { const o = mesh(geo('lente', () => new THREE.TorusGeometry(0.115, 0.026, 6, 16)), a.occhiali, s * 0.165, 0.45, 0.46); o.castShadow = false; H.add(o); }
+    H.add(box(0.1, 0.025, 0.02, a.occhiali, 0, 0.47, 0.47));
   }
   if (a.cappello && !a.testa) {
     const c = mesh(geo('berretto', () => new THREE.SphereGeometry(0.52, 18, 8, 0, Math.PI * 2, 0, Math.PI * 0.4)), a.cappello, 0, 0.45, -0.02);
     c.add(contorno(c, 1.05));
-    T.add(c); T.add(box(0.52, 0.05, 0.32, a.cappello, 0, 0.69, 0.5, 0.02)); T.add(sfera(0.06, '#ffffff', 0, 0.97, 0.12, 0, 8));
+    H.add(c); H.add(box(0.52, 0.05, 0.32, a.cappello, 0, 0.69, 0.5, 0.02)); H.add(sfera(0.06, '#ffffff', 0, 0.97, 0.12, 0, 8));
   }
-  if (a.tocco && !a.testa) { T.add(cil(0.33, 0.36, 0.28, '#151515', 0, 0.88, 0, 16, 0.02)); T.add(cil(0.365, 0.365, 0.06, '#d4af37', 0, 0.78, 0, 16)); }
+  if (a.elmo && !a.testa) {   // corazziere: elmo lucido con pennacchio
+    H.add(mesh(geo('elmo', () => new THREE.SphereGeometry(0.53, 18, 8, 0, Math.PI * 2, 0, Math.PI * 0.45)), '#d8d8e0', 0, 0.45, -0.02));
+    H.add(cil(0.04, 0.05, 0.25, '#d4af37', 0, 1.05, 0, 8)); const pn = sfera(0.16, '#c0392b', 0, 1.15, -0.18, 0, 10); pn.scale.set(0.5, 1, 1.6); H.add(pn);
+  }
+  if (a.tocco && !a.testa) { H.add(cil(0.33, 0.36, 0.28, '#151515', 0, 0.88, 0, 16, 0.02)); H.add(cil(0.365, 0.365, 0.06, '#d4af37', 0, 0.78, 0, 16)); }
   if (a.aura) { const au = mesh(geo('aura', () => new THREE.TorusGeometry(0.75, 0.05, 6, 32)), new THREE.MeshBasicMaterial({ color: '#ffd23f' }), 0, 0.04, 0);
     au.rotation.x = -Math.PI / 2; au.castShadow = false; g.add(au); p.aura = au; }
   // look rari (vinti negli incontri casuali o comprati con le monete)
-  if (a.sole) { for (const s of [-1, 1]) T.add(box(0.27, 0.15, 0.04, '#111118', s * 0.165, 0.45, 0.45)); T.add(box(0.1, 0.03, 0.03, '#111118', 0, 0.47, 0.46)); }
+  if (a.sole) { for (const s of [-1, 1]) H.add(box(0.27, 0.15, 0.04, '#111118', s * 0.165, 0.45, 0.45)); H.add(box(0.1, 0.03, 0.03, '#111118', 0, 0.47, 0.46)); }
   if (a.cuffie) {
-    T.add(mesh(geo('arco', () => new THREE.TorusGeometry(0.53, 0.05, 6, 20, Math.PI)), '#2a2a3a', 0, 0.45, 0));
-    for (const s of [-1, 1]) { const c = cil(0.16, 0.16, 0.13, '#ef4f5f', s * 0.5, 0.43, 0, 14, 0.02); c.rotation.z = Math.PI / 2; T.add(c); }
+    H.add(mesh(geo('arco', () => new THREE.TorusGeometry(0.53, 0.05, 6, 20, Math.PI)), '#2a2a3a', 0, 0.45, 0));
+    for (const s of [-1, 1]) { const c = cil(0.16, 0.16, 0.13, '#ef4f5f', s * 0.5, 0.43, 0, 14, 0.02); c.rotation.z = Math.PI / 2; H.add(c); }
   }
   if (a.alloro) {
-    const r = mesh(geo('alloro', () => new THREE.TorusGeometry(0.47, 0.045, 6, 24)), '#3f9e3a', 0, 0.68, 0); r.rotation.x = Math.PI / 2; T.add(r);
-    for (let i = 0; i < 16; i++) { const an = i / 16 * Math.PI * 2; T.add(sfera(0.075, '#6cc94f', Math.cos(an) * 0.48, 0.7, Math.sin(an) * 0.48, 0, 6)); }
+    const r = mesh(geo('alloro', () => new THREE.TorusGeometry(0.47, 0.045, 6, 24)), '#3f9e3a', 0, 0.68, 0); r.rotation.x = Math.PI / 2; H.add(r);
+    for (let i = 0; i < 16; i++) { const an = i / 16 * Math.PI * 2; H.add(sfera(0.075, '#6cc94f', Math.cos(an) * 0.48, 0.7, Math.sin(an) * 0.48, 0, 6)); }
   }
   if (a.laurea) {
-    T.add(cil(0.34, 0.36, 0.22, '#151515', 0, 0.86, 0, 16, 0.02));
-    const t = box(0.95, 0.06, 0.95, '#151515', 0, 1.0, 0, 0.02); t.rotation.y = Math.PI / 4; T.add(t);
-    T.add(box(0.04, 0.34, 0.04, '#ffd23f', 0.4, 0.86, 0.2));
+    H.add(cil(0.34, 0.36, 0.22, '#151515', 0, 0.86, 0, 16, 0.02));
+    const t = box(0.95, 0.06, 0.95, '#151515', 0, 1.0, 0, 0.02); t.rotation.y = Math.PI / 4; H.add(t);
+    H.add(box(0.04, 0.34, 0.04, '#ffd23f', 0.4, 0.86, 0.2));
   }
   if (a.parrucca) for (const [x, y, z] of [[0, 0.9, 0.05], [-0.28, 0.84, 0.12], [0.28, 0.84, 0.12], [-0.45, 0.62, 0], [0.45, 0.62, 0], [-0.48, 0.42, -0.05], [0.48, 0.42, -0.05],
-    [-0.47, 0.22, -0.1], [0.47, 0.22, -0.1], [0, 0.72, -0.38], [-0.3, 0.52, -0.35], [0.3, 0.52, -0.35], [0, 0.34, -0.43]]) T.add(sfera(0.17, '#f4f1ea', x, y, z, 0.02, 8));
-  if (a.mantello) ['#1f9e4a', '#ffffff', '#d32f2f'].forEach((col, i) => busto.add(box(0.27, 1.05, 0.05, col, (i - 1) * 0.27, 0.1, -0.27, 0.015)));
-  if (a.zaino) { busto.add(box(0.52, 0.56, 0.24, '#f08a24', 0, 0.32, -0.34, 0.025)); busto.add(box(0.36, 0.2, 0.06, '#c96a14', 0, 0.2, -0.47));
-    for (const s of [-1, 1]) busto.add(box(0.06, 0.5, 0.02, '#c96a14', s * 0.2, 0.34, F)); }
+    [-0.47, 0.22, -0.1], [0.47, 0.22, -0.1], [0, 0.72, -0.38], [-0.3, 0.52, -0.35], [0.3, 0.52, -0.35], [0, 0.34, -0.43]]) H.add(sfera(0.17, '#f4f1ea', x, y, z, 0.02, 8));
   if (a.aureola) { const au = mesh(geo('aureola', () => new THREE.TorusGeometry(0.32, 0.045, 6, 24)), new THREE.MeshBasicMaterial({ color: '#ffe27a' }), 0, 1.14, 0);
-    au.rotation.x = Math.PI / 2; au.castShadow = false; T.add(au); }
+    au.rotation.x = Math.PI / 2; au.castShadow = false; H.add(au); }
   if (a.scala) g.scale.setScalar(a.scala);
   return { g, p, t: Math.random() * 5, vel: 0, umore: null, tu: 0, blink: 1 + Math.random() * 3 };
 }
@@ -205,26 +220,26 @@ function anima(P, dt) {
   const p = P.p; P.t += dt;
   const v = P.vel, f = P.t * 10, sw = Math.sin(f) * 0.75 * v;
   p.gS.rotation.x = sw; p.gD.rotation.x = -sw;
-  let bS = -sw * 0.9, bD = sw * 0.9, zS = 0.08, zD = -0.08, y = 0, testa = 0, inclina = 0, scuoti = 0;
+  let bS = -sw * 0.9, bD = sw * 0.9, zS = 0.12, zD = -0.12, y = 0, testa = 0, inclina = 0, scuoti = 0;
   p.bocca.scale.set(1, 1, 1);
   if (P.umore) {
     P.tu -= dt;
     switch (P.umore) {
-      case 'felice': y = Math.abs(Math.sin(P.tu * 10)) * 0.45; zS = -2.5; zD = 2.5; bS = bD = 0; p.bocca.scale.set(1.6, 3, 1); break;
-      case 'triste': testa = 0.42; bS = bD = 0.15; scuoti = Math.sin(P.tu * 40) * 0.035; break;
+      case 'felice': y = Math.abs(Math.sin(P.tu * 10)) * 0.45; zS = -2.5; zD = 2.5; bS = bD = 0; p.bocca.scale.set(1.5, 2.6, 1); break;
+      case 'triste': testa = 0.42; bS = bD = 0.15; scuoti = Math.sin(P.tu * 40) * 0.035; p.bocca.scale.set(1, -1, 1); break;
       case 'lancia': bD = -2.4; break;
       case 'colpito': testa = -0.3; inclina = -0.28; scuoti = Math.sin(P.tu * 50) * 0.05; break;
-      case 'annuisce': testa = Math.sin(P.tu * 14) * 0.25; p.bocca.scale.set(1.4, 2, 1); break;
+      case 'annuisce': testa = Math.sin(P.tu * 14) * 0.25; p.bocca.scale.set(1.3, 1.8, 1); break;
       case 'punta': bD = -1.6; zD = 0.3; break;
     }
     if (P.tu <= 0) P.umore = null;
   }
   p.bS.rotation.set(bS, 0, zS); p.bD.rotation.set(bD, 0, zD);
   p.testa.rotation.x = testa; p.busto.rotation.x = inclina; p.busto.position.x = scuoti;
-  p.busto.position.y = 0.62 + Math.abs(Math.cos(f)) * 0.07 * v + Math.sin(P.t * 2.2) * 0.012;
+  p.busto.position.y = p.by + Math.abs(Math.cos(f)) * 0.06 * v + Math.sin(P.t * 2.2) * 0.012;
   P.g.position.y = y;
   P.blink -= dt; const chiuso = P.blink < 0.12; if (P.blink < 0) P.blink = 2 + Math.random() * 3;
-  for (const o of p.occhi) o.scale.y = chiuso ? 0.15 : 1.4;
+  for (const o of p.occhi) o.scale.y = chiuso ? 0.15 : o.userData.sy;
   if (p.aura) { p.aura.rotation.z += dt * 1.5; p.aura.scale.setScalar(1 + Math.sin(P.t * 3) * 0.08); }
 }
 const umore = (P, u, durata) => { if (P) { P.umore = u; P.tu = durata; } };
@@ -261,11 +276,23 @@ const STILI = {
   rettorato: { w: 14, d: 8, h: 7, muro: '#f4efe4', corn: '#d4af37', tetto: 'cupola', colonne: 8, bandiere: ['it', 'ue'] },
   libreria: { w: 9, d: 6, h: 5.6, muro: '#8a3b2e', corn: '#f2e6cf', tetto: 'timpano', tettoCol: '#5a2a1e', pila: true },
   casa: { w: 7, d: 5, h: 3.4, muro: '#f6e7c8', corn: '#ffffff', tetto: 'tetto', tettoCol: '#c0492b' },
+  // monumenti delle cittadine a tema
+  ambasciata: { w: 10, d: 6, h: 5, muro: '#f7f3ea', corn: '#1d3f99', tetto: 'piatto', colonne: 4, bandiere: ['it', 'fr', 'de', 'ue', 'ie', 'nl'] },
+  madama: { w: 10, d: 6, h: 6, muro: '#e8c27a', corn: '#fff8e6', tetto: 'piatto', colonne: 6, bandiere: ['it', 'ue'] },
+  chigi: { w: 9, d: 6, h: 6.2, muro: '#e9b45f', corn: '#fff3d6', tetto: 'piatto', bandiere: ['it', 'ue'] },
+  consulta: { w: 10, d: 6, h: 5.6, muro: '#f2e3c4', corn: '#fffaf0', tetto: 'timpano', tettoCol: '#c9a46a', colonne: 6, bilancia: true },
+  gazzetta: { w: 9, d: 6, h: 5, muro: '#dfe3ea', corn: '#22305a', tetto: 'piatto', giornale: true },
+  costituente: { w: 10, d: 6, h: 5.8, muro: '#f4efe4', corn: '#b08a3a', tetto: 'timpano', tettoCol: '#b08a3a', colonne: 6, bandiere: ['it'] },
+  ragioneria: { w: 9, d: 6, h: 5.4, muro: '#cfd8c4', corn: '#3a5a3a', tetto: 'timpano', tettoCol: '#3a5a3a', colonne: 4, moneta: true },
+  municipio: { w: 9, d: 6, h: 5.2, muro: '#f0c8a0', corn: '#8a3b2e', tetto: 'torre', orologio: true, bandiere: ['it'] },
+  sportelli: { w: 8, d: 5, h: 4, muro: '#e8eef6', corn: '#3d7bf2', tetto: 'piatto', vetri: true },
+  csm: { w: 10, d: 6, h: 5.6, muro: '#d6d0c4', corn: '#7a1f2b', tetto: 'piatto', colonne: 4, bandiere: ['it'] },
+  aula: { w: 10, d: 6, h: 5.4, muro: '#b5543a', corn: '#f2e6cf', tetto: 'timpano', tettoCol: '#8a3b2e', colonne: 4 },
 };
 const davanti = (L, s) => L.z + s.d / 2 + (s.colonne ? 2 : 0) + 2.2;   // dove sta il prof
 
 function palazzo(st, L) {
-  const s = STILI[L.stile], g = new THREE.Group(); g.position.set(L.x, 0, L.z); st.add(g);
+  const s = { ...STILI[L.stile], ...(L.muro ? { muro: L.muro } : {}), ...(L.tettoCol ? { tettoCol: L.tettoCol } : {}) }, g = new THREE.Group(); g.position.set(L.x, 0, L.z); st.add(g);
   const { w, d, h } = s, F = d / 2, top = 0.3 + h;
   g.add(box(w + 0.8, 0.3, d + 0.8, '#cfc6b4', 0, 0.15, 0, 0.03));
   g.add(box(w, h, d, s.muro, 0, 0.3 + h / 2, 0, 0.07));
@@ -298,8 +325,20 @@ function palazzo(st, L) {
     g.add(box(larg + 1.4, 0.3, 2.8, '#cfc6b4', 0, 0.15, F + 1.4));
     yIns = 0.3 + hc + 0.2; zIns = F + 2.32;
   }
-  const ins = insegna(L.giorno ? [L.nome.toUpperCase(), 'GIORNO ' + L.giorno] : [L.nome.toUpperCase()], 4.2, L.giorno ? 1.1 : 0.8);
-  ins.position.set(0, yIns + (s.colonne ? 0 : 0.05), zIns + 0.01); ins.castShadow = false; g.add(ins);
+  if (!L.anonimo) {
+    const ins = insegna(L.giorno ? [L.nome.toUpperCase(), 'PALESTRA ' + L.giorno] : [L.nome.toUpperCase()], 4.2, L.giorno ? 1.1 : 0.8);
+    ins.position.set(0, yIns + (s.colonne ? 0 : 0.05), zIns + 0.01); ins.castShadow = false; g.add(ins);
+  }
+  if (s.giornale) {   // un rotolo di Gazzetta Ufficiale gigante
+    const r = cil(0.9, 0.9, 3.2, '#fbf8ee', 3.2, 0.95, F + 1.6, 18, 0.04); r.rotation.z = Math.PI / 2; g.add(r);
+    const t = insegna(['GAZZETTA UFFICIALE'], 2.6, 0.5, '#fbf8ee', '#151515'); t.position.set(3.2, 0.95, F + 2.52); g.add(t);
+    OSTACOLI.push({ x: L.x + 3.2, z: L.z + F + 1.6, r: 1.8 });
+  }
+  if (s.moneta) {   // moneta gigante davanti alla Ragioneria
+    const m = cil(1, 1, 0.25, '#e0b53a', -3.3, 1.3, F + 2.4, 24, 0.04); m.rotation.x = Math.PI / 2; g.add(m);
+    const t = insegna(['€'], 1.2, 1.2, '#e0b53a', '#7a5a10'); t.position.set(-3.3, 1.3, F + 2.54); g.add(t);
+    g.add(box(0.6, 0.3, 0.6, '#cfc6b4', -3.3, 0.15, F + 2.4)); OSTACOLI.push({ x: L.x - 3.3, z: L.z + F + 2.4, r: 1.1 });
+  }
   // tetto
   if (s.tetto === 'timpano') g.add(prisma(w + 0.5, 1.6, d + 0.5, s.tettoCol, 0, top + 0.35, 0, 0.05));
   if (s.tetto === 'tetto') g.add(prisma(w + 1, 2.2, d + 1.2, s.tettoCol, 0, top + 0.3, 0, 0.06));
@@ -331,7 +370,8 @@ function palazzo(st, L) {
   if (s.bilancia) { const y0 = 0.3 + 4.2 + 1.1, z0 = F + 2.35;
     g.add(box(0.08, 0.9, 0.08, '#d4af37', 0, y0 + 0.6, z0)); g.add(box(1.5, 0.07, 0.07, '#d4af37', 0, y0 + 1.05, z0));
     for (const lx of [-1, 1]) { const piatto = cil(0.28, 0.18, 0.1, '#d4af37', lx * 0.7, y0 + 0.62, z0, 10); g.add(piatto); g.add(box(0.03, 0.4, 0.03, '#d4af37', lx * 0.7, y0 + 0.85, z0)); } }
-  for (const [i, b] of (s.bandiere || []).entries()) bandiera(st, b, L.x + (s.tetto === 'torre' ? -0.4 + i * 0.8 : -w / 2 + 0.7 + i * (w - 1.4)), top + (s.tetto === 'torre' ? 2.5 : 0.35), L.z + (s.tetto === 'torre' ? tz : F - 0.3));
+  const nb = (s.bandiere || []).length;
+  for (const [i, b] of (s.bandiere || []).entries()) bandiera(st, b, L.x + (s.tetto === 'torre' ? -0.4 + i * 0.8 : -w / 2 + 0.7 + i * (w - 1.4) / Math.max(1, nb - 1)), top + (s.tetto === 'torre' ? 2.5 : 0.35), L.z + (s.tetto === 'torre' ? tz : F - 0.3));
   // aiuole davanti
   for (const lx of [-1, 1]) { g.add(box(2, 0.4, 0.9, '#8a6a4a', lx * (w / 2 - 1.3), 0.5, F + 0.6, 0.03)); fiori.push([L.x + lx * (w / 2 - 1.3), L.z + F + 0.6, 2, 0.8, 0.72]); }
   OSTACOLI.push({ x1: L.x - w / 2 - 0.5, x2: L.x + w / 2 + 0.5, z1: L.z - d / 2 - 0.5, z2: L.z + F + (s.colonne ? 2.6 : 1.1) });
@@ -363,7 +403,8 @@ function piantaAlberi() {
     fm.setMatrixAt(k, m4.compose(v.set(x + (Math.random() - 0.5) * w, y + Math.random() * 0.08, z + (Math.random() - 0.5) * d), q, sc.set(1, 1, 1)));
     fm.setColorAt(k, c.set(col[k % col.length]));
   }
-  scena.add(fm);
+  if (tot) scena.add(fm);
+  alberi.length = 0; fiori.length = 0;   // pronti per la zona successiva (un gruppo per zona: si disegna solo quello che si vede)
 }
 function lampione(st, x, z) {
   st.add(cil(0.08, 0.11, 3.2, '#2e2e3a', x, 1.6, z, 8));
@@ -402,24 +443,109 @@ function unisci(radice) {
 }
 
 // ---------- La città ----------
-export function costruisci(luoghi, vestito) {
+// ---------- Monumenti speciali delle cittadine ----------
+function faro(st, x, z) {   // faro sul mare territoriale
+  st.add(box(12, 0.1, 9, '#4fb4ff', x, 0.03, z, 0));
+  for (const [dx, dz, r] of [[-1.2, 0.6, 1.1], [1.1, -0.4, 0.9], [0.2, 1.4, 0.8]]) { const sc = sfera(r, '#8a8a96', x + dx, 0.3, z + dz, 0.03, 8); sc.scale.y = 0.6; st.add(sc); }
+  for (let i = 0; i < 5; i++) st.add(cil(0.95 - i * 0.1, 1.05 - i * 0.1, 1.2, i % 2 ? '#ffffff' : '#d32f2f', x, 0.6 + i * 1.2, z, 16, 0.04));
+  st.add(cil(0.75, 0.75, 0.9, '#2e2e3a', x, 6.45, z, 12, 0.04));
+  st.add(mesh(geo('lanterna', () => new THREE.SphereGeometry(0.55, 12, 8)), M.lampada, x, 6.5, z));
+  st.add(cil(0.1, 0.85, 0.7, '#d32f2f', x, 7.25, z, 12, 0.03));
+  OSTACOLI.push({ x1: x - 6, x2: x + 6, z1: z - 4.5, z2: z + 4.5 });
+}
+function palco(st, x, z) {   // palco del comizio
+  st.add(box(7, 1, 4, '#8a5a2b', x, 0.5, z, 0.05)); st.add(box(7.2, 0.15, 4.2, '#b0263a', x, 1.05, z));
+  st.add(box(7, 3.2, 0.3, '#1d3f99', x, 2.7, z - 1.9, 0.04));
+  ['#1f9e4a', '#ffffff', '#d32f2f'].forEach((c, i) => st.add(box(2.33, 0.5, 0.32, c, x - 2.33 + i * 2.33, 4.1, z - 1.9)));
+  st.add(cil(0.04, 0.06, 1.3, '#2e2e3a', x, 1.75, z + 0.8, 8)); st.add(sfera(0.12, '#2e2e3a', x, 2.45, z + 0.8, 0, 8));
+  for (let i = 0; i < 7; i++) st.add(sfera(0.18, ['#ffd23f', '#ef4f5f', '#3d7bf2'][i % 3], x - 3 + i, 3.1 + Math.sin(i) * 0.1, z - 1.6, 0, 8));
+  OSTACOLI.push({ x1: x - 3.6, x2: x + 3.6, z1: z - 2.2, z2: z + 2.1 });
+}
+function carcere(st, x, z) {   // mura con torrette e un blocco con le sbarre
+  const W = 13, Dd = 9;
+  for (const lx of [-1, 1]) st.add(box(0.6, 3.6, Dd, '#8a8a96', x + lx * W / 2, 1.8, z, 0.04));
+  st.add(box(W, 3.6, 0.6, '#8a8a96', x, 1.8, z - Dd / 2, 0.04));
+  for (const lx of [-1, 1]) st.add(box(W / 2 - 1.5, 3.6, 0.6, '#8a8a96', x + lx * (W / 4 + 0.75), 1.8, z + Dd / 2, 0.04));
+  st.add(box(3, 3, 0.4, '#5a5a66', x, 1.5, z + Dd / 2, 0.03));   // portone
+  for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    st.add(box(1.6, 5.4, 1.6, '#a0a0aa', x + lx * W / 2, 2.7, z + lz * Dd / 2, 0.04)); st.add(prisma(2, 1, 2, '#5a5a66', x + lx * W / 2, 5.4, z + lz * Dd / 2, 0.03));
+  }
+  st.add(box(7, 4.5, 4, '#c4c0b8', x, 2.25, z - 1, 0.05));
+  for (let i = 0; i < 4; i++) { const fx = x - 2.4 + i * 1.6; st.add(box(0.9, 1, 0.1, '#2e2e3a', fx, 3, z + 1.02));
+    for (let b = 0; b < 4; b++) st.add(box(0.05, 1, 0.14, '#9a9aa6', fx - 0.33 + b * 0.22, 3, z + 1.06)); }
+  OSTACOLI.push({ x1: x - W / 2 - 0.8, x2: x + W / 2 + 0.8, z1: z - Dd / 2 - 0.8, z2: z + Dd / 2 + 0.4 });
+}
+function torreVetro(st, x, z) {   // il Parlamento europeo di Strasburgo, in piccolo
+  st.add(cil(4, 4.2, 0.3, '#cfc6b4', x, 0.15, z, 28, 0.03));
+  st.add(mesh(new THREE.CylinderGeometry(3.4, 3.6, 8, 28, 1, true), M.finestra, x, 4.3, z));
+  for (let y = 1.3; y < 8.3; y += 1.4) st.add(cil(3.62, 3.62, 0.15, '#dbe8f7', x, y, z, 28));
+  st.add(cil(3.7, 3.7, 0.3, '#4a7fc1', x, 8.4, z, 28, 0.04));
+  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; st.add(box(0.35, 0.35, 0.1, '#ffd23f', x + Math.cos(a) * 1.4, 6 + Math.sin(a) * 1.4, z + 3.65)); }
+  OSTACOLI.push({ x, z, r: 4.3 });
+}
+const SPECIALI = { faro, palco, carcere, torre: torreVetro };
+
+// ---------- Il mondo: 10 cittadine in fila verso nord, unite da percorsi con un varco ----------
+export const PASSO = 95;
+const zc = k => -PASSO * k;
+const VARCHI = [], PEDANE = [], LEVE = {}, GETTI = [];
+let ultimaPedana = null;
+export function costruisci(luoghi, citta, vestito) {
   if (!ok) return;
+  const N = citta.length;
+  Object.assign(LIM, { x1: -25.5, x2: 25.5, z1: zc(N - 1) - 26, z2: 26 });
+  const lung = LIM.z2 - LIM.z1 + 140;
+  const prato = new THREE.Mesh(new THREE.PlaneGeometry(260, lung), M.erba); prato.rotation.x = -Math.PI / 2; prato.position.z = (LIM.z1 + LIM.z2) / 2; prato.receiveShadow = true; scena.add(prato);
+  const colori = ['#f6e7c8', '#cfe3f7', '#f7d6d0', '#dff0d0', '#f3e1a8', '#e6d8f2'];
+  for (let k = 0; k < N; k++) {
+    const C = citta[k], z0 = zc(k), st = new THREE.Group();
+    st.add(mesh(gBox(8, 0.04, 54), M.strada, 0, 0.02, z0));                                           // viale
+    st.add(mesh(geo('piazza', () => new THREE.CylinderGeometry(8, 8, 0.07, 44)), M.piazza, 0, 0.035, z0 + 4));
+    if (k % 2 === 0) {   // fontana
+      st.add(cil(2.9, 3.1, 0.6, '#cfc6b4', 0, 0.3, z0 + 4, 28, 0.04));
+      st.add(mesh(geo('acqua', () => new THREE.CylinderGeometry(2.6, 2.6, 0.1, 28)), new THREE.MeshToonMaterial({ color: '#4fb4ff', gradientMap: GRAD }), 0, 0.58, z0 + 4));
+      st.add(cil(0.35, 0.5, 1.6, '#cfc6b4', 0, 0.9, z0 + 4, 12, 0.03)); st.add(cil(1.1, 0.4, 0.35, '#cfc6b4', 0, 1.75, z0 + 4, 16, 0.03));
+      const getto = mesh(new THREE.ConeGeometry(0.35, 1.4, 10, 1, true), new THREE.MeshBasicMaterial({ color: '#bfe6ff', transparent: true, opacity: 0.75 }), 0, 2.55, z0 + 4);
+      getto.castShadow = false; scena.add(getto); GETTI.push(getto);
+    } else {   // obelisco con il colore della città
+      st.add(box(2.6, 0.8, 2.6, '#cfc6b4', 0, 0.4, z0 + 4, 0.04)); st.add(box(1.2, 0.5, 1.2, C.colore, 0, 1.05, z0 + 4, 0.03));
+      st.add(cil(0.25, 0.6, 5, '#efe6d2', 0, 3.8, z0 + 4, 4, 0.04)); st.add(cil(0, 0.27, 0.6, '#d4af37', 0, 6.6, z0 + 4, 4, 0.02));
+    }
+    OSTACOLI.push({ x: 0, z: z0 + 4, r: 3.3 });
+    for (const [x, z, r] of [[-5, 10, 0.6], [5, 10, -0.6], [-5, -2, 2.5], [5, -2, -2.5]]) panchina(st, x, z0 + z, r);
+    for (let z = z0 + 25; z > z0 - 27; z -= 9) for (const lx of [-1, 1]) if (Math.abs(z - z0 - 4) > 9) lampione(st, lx * 4.6, z);
+    // cartello di benvenuto
+    const cart = insegna([C.nome.toUpperCase()], 4.6, 0.95, C.colore, '#1d1b2e'); cart.position.set(-7.4, 2.5, z0 + 24.6); cart.castShadow = false; st.add(cart);
+    for (const lx of [-1, 1]) st.add(cil(0.08, 0.08, 2.6, '#6b3f1d', -7.4 + lx * 2.1, 1.3, z0 + 24.5, 6));
+    OSTACOLI.push({ x1: -9.7, x2: -5.1, z1: z0 + 24.2, z2: z0 + 24.8 });
+    // case ai bordi
+    for (const [i, [x, dz]] of [[-21.5, 23], [21.5, 23], [-21.5, 1], [21.5, 1], [-21.5, -21], [21.5, -21]].entries()) {
+      const L = { id: `casa-${k}-${i}`, stile: 'casa', x, z: z0 + dz, anonimo: true, muro: colori[(k + i) % colori.length], tettoCol: ['#c0492b', '#5a6a8a', '#7a4a2a'][(k + i) % 3] };
+      palazzo(st, L); PIANTA.push({ id: L.id, x, z: L.z, w: 7, d: 5, col: L.muro, casa: true });
+    }
+    // monumenti a tema (non si entra: ci si avvicina e il compagno spiega)
+    for (const P of C.luoghi || []) {
+      if (SPECIALI[P.speciale]) SPECIALI[P.speciale](st, P.x, P.z);
+      else palazzo(st, P);
+      const s = STILI[P.stile] || { w: 10, d: 7 }, nz = P.speciale ? P.z + (P.speciale === 'faro' ? 5.6 : P.speciale === 'torre' ? 5.2 : P.speciale === 'carcere' ? 5.6 : 3) : davanti(P, s) - 0.6;
+      if (!P.speciale && P.x) st.add(mesh(gBox(Math.abs(P.x) - 4, 0.04, 3.4), M.strada, Math.sign(P.x) * (Math.abs(P.x) + 4) / 2, 0.02, nz));
+      const segno = sprite(TEX_SEGNO.info, 0.9, 0.9); segno.position.set(P.x, 2.4, nz); scena.add(segno);
+      const et = sprite(tex([P.nome], { fg: '#ffffff', ombra: '#17142a', font: 70 }), 3.4, 0.85); et.position.set(P.x, 1.7, nz); scena.add(et);
+      NPC.set(P.id, { P: null, x: P.x, z: nz, segno, et, h: 2.4, info: true });
+      PIANTA.push({ id: P.id, x: P.x, z: P.z, w: s.w || 12, d: s.d || 9, col: s.muro || '#a0a0aa', monumento: true });
+    }
+    // alberi ai margini e siepi della città
+    for (let z = z0 + 26; z > z0 - 27; z -= 3.3) for (const lx of [-1, 1]) { alberi.push([lx * (28 + (Math.abs(z * 7) % 3)), z, 1.1 + (Math.abs(z * 13) % 5) / 10]); alberi.push([lx * (33 + (Math.abs(z * 5) % 2)), z + 1.5, 1.3]); }
+    for (const lx of [-1, 1]) for (const dz of [16, -6, -15]) { alberi.push([lx * 7.5, z0 + dz, 0.9]); OSTACOLI.push({ x: lx * 7.5, z: z0 + dz, r: 0.7 }); }
+    for (const lx of [-1, 1]) st.add(box(0.9, 1.1, 54, M.siepe, lx * 26.3, 0.55, z0, 0.04));
+    if (k === 0) st.add(box(53.5, 1.1, 0.9, M.siepe, 0, 0.55, z0 + 27, 0.04));
+    if (k === N - 1) st.add(box(53.5, 1.1, 0.9, M.siepe, 0, 0.55, z0 - 27, 0.04));
+    else percorsoTra(st, k);
+    scena.add(unisci(st));
+    piantaAlberi();
+  }
+  // palazzi del gioco (palestre, casa, biblioteca, rettorato) e chi ci sta davanti
   const st = new THREE.Group();
-  const prato = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), M.erba); prato.rotation.x = -Math.PI / 2; prato.receiveShadow = true; scena.add(prato);
-  st.add(mesh(gBox(8, 0.04, 115), M.strada, 0, 0.02, -13.5));                               // viale
-  const piazza = mesh(new THREE.CylinderGeometry(7, 7, 0.07, 40), M.piazza, 0, 0.035, 6); st.add(piazza);
-  st.add(mesh(gBox(20, 0.06, 12), M.piazza, 0, 0.03, -55));                                 // piazza del rettorato
-  // fontana
-  st.add(cil(2.9, 3.1, 0.6, '#cfc6b4', 0, 0.3, 6, 28, 0.04));
-  const acqua = mesh(new THREE.CylinderGeometry(2.6, 2.6, 0.1, 28), new THREE.MeshToonMaterial({ color: '#4fb4ff', gradientMap: GRAD, transparent: true, opacity: 0.9 }), 0, 0.58, 6);
-  st.add(acqua); st.add(cil(0.35, 0.5, 1.6, '#cfc6b4', 0, 0.9, 6, 12, 0.03)); st.add(cil(1.1, 0.4, 0.35, '#cfc6b4', 0, 1.75, 6, 16, 0.03));
-  const getto = mesh(new THREE.ConeGeometry(0.35, 1.4, 10, 1, true), new THREE.MeshBasicMaterial({ color: '#bfe6ff', transparent: true, opacity: 0.75 }), 0, 2.55, 6);
-  getto.castShadow = false; scena.add(getto); vivi.getto = getto;
-  OSTACOLI.push({ x: 0, z: 6, r: 3.3 });
-  for (const [x, z, r] of [[-5, 10, 0.6], [5, 10, -0.6], [-5, 2, 2.5], [5, 2, -2.5]]) panchina(st, x, z, r);
-  bandiera(st, 'it', -4.6, 0, -53, 1.4); bandiera(st, 'ue', 4.6, 0, -53, 1.4);
-  for (let z = 40; z > -60; z -= 9) for (const lx of [-1, 1]) if (Math.abs(z - 6) > 8) lampione(st, lx * 4.6, z);
-  // palazzi, vialetti e prof
   for (const L of luoghi) {
     const s = STILI[L.stile]; palazzo(st, L);
     const nz = davanti(L, s);
@@ -446,22 +572,138 @@ export function costruisci(luoghi, vestito) {
       OSTACOLI.push({ x: L.x + 2.2, z: nz - 1, r: 0.9 });
     }
   }
-  // siepi di confine e alberi
-  for (const lx of [-1, 1]) st.add(box(0.9, 1.1, 117.6, M.siepe, lx * 20.6, 0.55, -13.5, 0.04));
-  st.add(box(42, 1.1, 0.9, M.siepe, 0, 0.55, 45.3, 0.04)); st.add(box(42, 1.1, 0.9, M.siepe, 0, 0.55, -72.3, 0.04));
-  for (let z = 49; z > -78; z -= 3.2) for (const lx of [-1, 1]) { alberi.push([lx * (23 + (z * 7 % 3)), z, 1.1 + (Math.abs(z * 13) % 5) / 10]); alberi.push([lx * (27.5 + (z * 5 % 2)), z + 1.5, 1.3]); }
-  for (let x = -18; x <= 18; x += 3.6) { alberi.push([x, 48.5, 1.2]); alberi.push([x + 1.5, -75.5, 1.3]); }
-  for (const L of luoghi) if (L.x) for (const lz of [-1, 1]) { const x = Math.sign(L.x) * 18, z = L.z + lz * 4.6; alberi.push([x, z, 0.9]); OSTACOLI.push({ x, z, r: 0.7 }); }
-  for (const [x, z] of [[-7, 28], [7, 28], [-7, -13], [7, -13], [-7, -33], [7, -33]]) { alberi.push([x, z, 1]); OSTACOLI.push({ x, z, r: 0.7 }); }
-  fiori.push([-14, -57, 4, 2], [14, -57, 4, 2]);
   scena.add(unisci(st));
-  piantaAlberi();
-  // segnalino di destinazione
+  const fondo = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.MeshBasicMaterial({ color: '#241f33' })); fondo.rotation.x = -Math.PI / 2; fondo.position.set(0, -0.4, 150); scena.add(fondo);
   marcaDest = mesh(new THREE.RingGeometry(0.35, 0.55, 24), new THREE.MeshBasicMaterial({ color: '#ffd23f', transparent: true }), 0, 0.08, 0);
   marcaDest.rotation.x = -Math.PI / 2; marcaDest.visible = false; marcaDest.castShadow = false; scena.add(marcaDest);
   G.P = creaGiocatore(vestito); scena.add(G.P.g);
   inquadra(0, true);
 }
+// Percorso k: dalla città k alla città k+1. Siepi ai lati, bosco fuori, un varco di pietra a metà.
+function percorsoTra(st, k) {
+  const z0 = zc(k), a = z0 - 27, b = z0 - 68, gz = z0 - 56, len = a - b;
+  st.add(mesh(gBox(8, 0.04, len), M.strada, 0, 0.02, (a + b) / 2));
+  for (const lx of [-1, 1]) {
+    st.add(box(0.9, 1.1, len, M.siepe, lx * 7, 0.55, (a + b) / 2, 0.04));
+    st.add(box(19.5, 1.1, 0.9, M.siepe, lx * 16.8, 0.55, a, 0.04)); st.add(box(19.5, 1.1, 0.9, M.siepe, lx * 16.8, 0.55, b, 0.04));
+    OSTACOLI.push({ x1: lx < 0 ? -27 : 6.6, x2: lx < 0 ? -6.6 : 27, z1: b - 0.5, z2: a + 0.5 });
+    for (let z = a - 1; z > b; z -= 2.6) for (let x = 9; x < 34; x += 3.2) alberi.push([lx * (x + Math.abs(z * 3.7 % 1.4)), z + (x % 2), 0.9 + Math.abs((z * x) % 7) / 10]);
+    fiori.push([lx * 5.8, (a + gz) / 2, 1.2, 14], [lx * 5.8, (gz + b) / 2, 1.2, 8]);
+  }
+  // il varco: muro, pilastri e un cancello che sprofonda quando si apre
+  for (const lx of [-1, 1]) {
+    st.add(box(4.6, 2.6, 1, '#8a8a96', lx * 4.3, 1.3, gz, 0.05));
+    for (let i = 0; i < 3; i++) st.add(box(0.6, 0.5, 1.05, '#8a8a96', lx * (2.8 + i * 1.5), 2.85, gz));
+    st.add(box(0.9, 3.6, 1.3, '#a0a0aa', lx * 2.2, 1.8, gz, 0.05)); st.add(sfera(0.5, '#d4af37', lx * 2.2, 3.9, gz, 0.04, 10));
+    OSTACOLI.push({ x1: lx < 0 ? -6.6 : 1.7, x2: lx < 0 ? -1.7 : 6.6, z1: gz - 0.6, z2: gz + 0.6 });
+  }
+  const t = insegna([`VARCO ${k + 1}`], 2.8, 0.6, '#3a3050', '#ffd23f'); t.position.set(0, 3.6, gz + 0.68); t.castShadow = false; st.add(t);
+  st.add(box(3.6, 0.5, 1.1, '#8a8a96', 0, 3.6, gz, 0.04));
+  const sbarre = new THREE.Group(); sbarre.position.set(0, 0, gz); scena.add(sbarre);
+  for (let i = 0; i < 6; i++) sbarre.add(cil(0.07, 0.07, 3, '#3a3a44', -1.45 + i * 0.58, 1.5, 0, 8, 0.02));
+  sbarre.add(box(3.3, 0.18, 0.18, '#3a3a44', 0, 2.4, 0)); sbarre.add(box(3.3, 0.18, 0.18, '#3a3a44', 0, 0.8, 0));
+  const segno = sprite(TEX_SEGNO.chiuso, 0.9, 0.9); segno.position.set(0, 3.2, gz + 2.4); scena.add(segno);
+  NPC.set(`varco-${k}`, { P: null, x: 0, z: gz + 2.4, segno, h: 4.6 });
+  VARCHI[k] = { z: gz, aperto: false, sbarre, y: 0 };
+  PIANTA.push({ id: `varco-${k}`, x: 0, z: gz, w: 13, d: 1, col: '#8a8a96', varco: k });
+}
+export function varchi(aperti) {   // aperti[k] = true se il varco k è aperto
+  if (!ok) return;
+  let cambiato = false;
+  VARCHI.forEach((v, k) => { const a = !!aperti[k]; if (a !== v.aperto) { v.aperto = a; cambiato = true; if (a) scoppio(0, 2, v.z, ['#ffd23f', '#ffffff', '#3ec46d'], 50, 4); }
+    const n = NPC.get(`varco-${k}`); if (n) { n.segno.material.map = a ? TEX_SEGNO.fatto : TEX_SEGNO.chiuso; n.segno.material.needsUpdate = true; } });
+  if (cambiato) for (const k in GRIGLIE) delete GRIGLIE[k];   // il percorso calcolato cambia
+}
+const zBlocco = () => { const v = VARCHI.find(x => x && !x.aperto); return v ? v.z : -Infinity; };   // oltre il primo varco chiuso non si va
+export function zonaDi(z) { return Math.max(0, Math.min(VARCHI.length, Math.round(-z / PASSO))); }
+export function vaiCitta(k) {   // viaggio rapido nella piazza di una città già visitata
+  if (!ok) return;
+  G.x = 2; G.z = zc(k) + 14; G.rot = Math.PI; G.dest = G.seg = null; dentro = null; stanza = null; pan.x = pan.z = 0; marcaDest.visible = false;
+  G.P.g.position.set(G.x, 0, G.z); if (AMICO) { AMICO.x = G.x - 1; AMICO.z = G.z + 1.6; }
+  scoppio(G.x, 1, G.z, ['#ffffff', '#bfe6ff'], 30, 2.5); stacco = true;
+}
+
+// ---------- Rompicapi lungo i percorsi ----------
+const POSTI_PEDANE = [[-4, -35], [0, -38], [4, -35], [-4, -44], [0, -47], [4, -44]];
+export function enigma(k, def) {
+  if (!ok) return;
+  const z0 = zc(k);
+  if (def.tipo === 'leve') {
+    LEVE[k] = def.n ? Array.from({ length: def.n }, (_, i) => {
+      const x = i % 2 ? 4.6 : -4.6, z = z0 - 32 - i * 4;
+      const g = new THREE.Group(); g.position.set(x, 0, z); scena.add(g);
+      g.add(box(0.9, 0.6, 0.9, '#8a8a96', 0, 0.3, 0, 0.03)); g.add(box(0.5, 0.08, 0.7, '#3a3a44', 0, 0.62, 0));
+      const stecca = new THREE.Group(); stecca.position.y = 0.62; g.add(stecca);
+      stecca.add(cil(0.06, 0.06, 1, '#c9c9d6', 0, 0.5, 0, 8, 0.02)); stecca.add(sfera(0.16, '#ef4f5f', 0, 1.05, 0, 0.02, 10));
+      stecca.rotation.x = 0.55;   // giù = falsa
+      const segno = sprite(tex([String(i + 1)], { w: 128, h: 128, font: 100, fg: '#ffd23f', ombra: '#17142a' }), 0.9, 0.9); segno.position.set(x, 2.3, z); scena.add(segno);
+      NPC.set(`leva-${k}-${i}`, { P: null, x, z, segno, h: 2.3 }); OSTACOLI.push({ x, z, r: 0.55 });
+      return { stecca, pomo: stecca.children[1] };
+    }) : [];
+  } else if (def.tipo === 'pedane') {
+    const ordine = def.etichette.map((_, i) => i).sort((a, b) => ((a * 7 + k * 3) % 11) - ((b * 7 + k * 3) % 11));   // sparse, sempre uguali
+    def.etichette.forEach((t, i) => {
+      const [dx, dz] = POSTI_PEDANE[ordine[i]], x = dx, z = z0 + dz, m = toon('#d9d2c3');
+      const p = mesh(geo('pedana', () => new THREE.CylinderGeometry(1.05, 1.1, 0.14, 24)), m, x, 0.07, z); p.add(contorno(p, 1.05)); scena.add(p);
+      const et = sprite(tex([t], { fg: '#ffffff', ombra: '#17142a', font: 72, w: 640 }), 4.2, 0.84); et.position.set(x, 1.3, z); scena.add(et);
+      PEDANE.push({ k, i, x, z, m, et });
+    });
+  } else if (def.tipo === 'sportello') {
+    const x = -4.4, z = z0 - 41, g = new THREE.Group(); g.position.set(x, 0, z); scena.add(g);
+    g.add(box(2.6, 1.1, 1, '#8a5a2b', 0, 0.55, 0.6, 0.03)); g.add(box(2.8, 0.12, 1.2, '#c98f5a', 0, 1.16, 0.6));
+    for (const lx of [-1, 1]) g.add(cil(0.07, 0.07, 2.6, '#3a3a44', lx * 1.3, 1.3, 1.05, 8));
+    g.add(prisma(3.2, 0.7, 1.8, '#3d7bf2', 0, 2.6, 0.4, 0.03));
+    const ins = insegna([def.insegna || 'SPORTELLO'], 2.4, 0.5, '#fff3d6', '#22305a'); ins.position.set(0, 2.3, 1.32); g.add(ins);
+    const P = persona(def.persona || { corpo: '#3d7bf2', gambe: '#2a2a3a', camicia: true, cravatta: '#22305a', stile: 'corti', capelli: '#2a1a10', occhiali: '#2a2420' });
+    P.g.position.set(x, 0, z - 0.3); scena.add(P.g);
+    const segno = sprite(TEX_SEGNO.info, 0.9, 0.9); segno.position.set(x, 3.6, z + 1.6); scena.add(segno);
+    NPC.set(`sportello-${k}`, { P, x, z: z + 1.6, rot: 0, segno, h: 3.6, fermo: true }); OSTACOLI.push({ x1: x - 1.5, x2: x + 1.5, z1: z - 0.8, z2: z + 1.2 });
+  }
+}
+export function leva(k, i, su) { const l = LEVE[k] && LEVE[k][i]; if (l) { l.stecca.rotation.x = su ? -0.55 : 0.55; l.pomo.material = mat(su ? '#3ec46d' : '#ef4f5f'); } }
+export function pedana(k, i, stato) {   // stato: 'off' | 'ok' | 'ko'; i = -1 per tutte
+  for (const p of PEDANE) if (p.k === k && (i < 0 || p.i === i)) p.m.color.set(stato === 'ok' ? '#3ec46d' : stato === 'ko' ? '#ef4f5f' : '#d9d2c3');
+}
+
+function pestaPedane() {
+  if (modo !== 'esplora' || stanza || !PEDANE.length) return;
+  const sopra = PEDANE.find(p => Math.abs(p.z - G.z) < 1.2 && Math.hypot(p.x - G.x, p.z - G.z) < 0.95);
+  if (sopra && sopra !== ultimaPedana) { ultimaPedana = sopra; opz.onPedana && opz.onPedana(sopra.k, sopra.i); }
+  else if (!sopra && ultimaPedana && Math.hypot(ultimaPedana.x - G.x, ultimaPedana.z - G.z) > 1.4) ultimaPedana = null;
+}
+// ---------- Il compagno di studio: ti segue ovunque ----------
+let AMICO = null;
+export function compagno(aspetto, nome) {
+  if (!ok) return;
+  if (AMICO) scena.remove(AMICO.P.g, AMICO.et);
+  const P = persona(aspetto); scena.add(P.g);
+  const et = sprite(tex([nome], { fg: '#ffe27a', ombra: '#17142a', font: 76 }), 2.8, 0.7); scena.add(et);
+  AMICO = { P, et, x: G.x - 1.2, z: G.z + 1.6, rot: G.rot };
+}
+function seguiAmico(dt) {
+  if (!AMICO) return;
+  const A = AMICO, f = { x: Math.sin(G.rot), z: Math.cos(G.rot) };
+  let tx, tz;
+  if (modo === 'duello' && NPC.get(fuoco)) {   // in lotta sta dietro di te, un po' di lato
+    const n = NPC.get(fuoco), l = Math.hypot(G.x - n.x, G.z - n.z) || 1, ux = (G.x - n.x) / l, uz = (G.z - n.z) / l;
+    tx = G.x + ux * 1.3 - uz * 1.1; tz = G.z + uz * 1.3 + ux * 1.1;
+    A.x = tx; A.z = tz; A.rot = Math.atan2(n.x - A.x, n.z - A.z); A.P.vel = 0;
+  } else {
+    tx = G.x - f.x * 1.7 + f.z * 0.9; tz = G.z - f.z * 1.7 - f.x * 0.9;
+    const d = Math.hypot(tx - A.x, tz - A.z);
+    if (d > 14 || Math.abs(A.z - G.z) > 60) { A.x = libero(tx, tz) ? tx : G.x; A.z = libero(tx, tz) ? tz : G.z + 0.5; }
+    else if (d > 0.35) {
+      const v = Math.min(VEL * 4.2, d * 3.2) * dt, nx = A.x + (tx - A.x) / d * v, nz = A.z + (tz - A.z) / d * v;
+      if (libero(nx, nz)) { A.x = nx; A.z = nz; } else if (libero(nx, A.z)) A.x = nx; else if (libero(A.x, nz)) A.z = nz;
+      gira(A, Math.atan2(tx - A.x, tz - A.z), dt);
+    } else gira(A, G.rot, dt);
+    A.P.vel += ((d > 0.35 ? Math.min(1, d / 2) : 0) - A.P.vel) * Math.min(1, dt * 8);
+  }
+  A.P.g.position.set(A.x, 0, A.z); A.P.g.rotation.y = A.rot; anima(A.P, dt);
+  A.et.position.set(A.x, 2.85, A.z); A.et.visible = modo === 'esplora';
+  A.P.g.visible = modo !== 'biblioteca';
+}
+export function amicoReagisce(u) { if (AMICO) umore(AMICO.P, u, 1.2); }
 const vivi = {};
 const TEX_SEGNO = {};
 const PIANTA = [];                      // per la minimappa: palazzi e porte
@@ -532,7 +774,7 @@ export function segni(stato) {   // id -> 'sfida' | 'medaglia' | 'allarme' | 'fa
   for (const [id, v] of Object.entries(stato)) { const n = NPC.get(id); if (n && TEX_SEGNO[v] && n.segno.material.map !== TEX_SEGNO[v]) { n.segno.material.map = TEX_SEGNO[v]; n.segno.material.needsUpdate = true; } }
 }
 export const pianta = () => PIANTA;
-export function dove() { const e = NPC.get('evento'); return { x: G.x, z: G.z, rot: G.rot, stanza, ev: e ? { x: e.x, z: e.z } : null, cx: camL.x, cz: camL.z }; }
+export function dove() { const e = NPC.get('evento'); return { x: G.x, z: G.z, rot: G.rot, stanza, zona: zonaDi(G.z), ev: e ? { x: e.x, z: e.z } : null, cx: camL.x, cz: camL.z }; }
 
 const IZ = 130;                       // la sala è costruita lontano dalla città, a sud
 const COL_LIV = ['#bdb5a6', '#e8504a', '#f09a30', '#3d7bf2', '#ffd23f'];   // mai, 1, 2, 3, 4 volte
@@ -614,6 +856,7 @@ export function evento(aspetto, nome) {
   for (let k = 0; k < 20; k++) {
     const an = G.rot + (Math.random() - 0.5) * 2.2, r = 6 + Math.random() * 5;
     const x = G.x + Math.sin(an) * r, z = G.z + Math.cos(an) * r;
+    if (z < zBlocco() + 1.5) continue;   // mai oltre un varco chiuso
     if (!libero(x, z) || [...NPC.values()].some(n => Math.hypot(n.x - x, n.z - z) < 5)) continue;
     const P = persona(aspetto); P.g.position.set(x, 0, z); scena.add(P.g);
     const et = sprite(tex([nome], { fg: '#ffffff', ombra: '#17142a', font: 76 }), 3.4, 0.85); et.position.set(x, 2.95, z); scena.add(et);
@@ -655,6 +898,7 @@ export function init(canvas, o) {
   TEX_SEGNO.armadio = tex(['👕'], { w: 128, h: 128, font: 96 });
   TEX_SEGNO.evento = tex(['💰'], { w: 128, h: 128, font: 96 });
   TEX_SEGNO.libri = tex(['📚'], { w: 128, h: 128, font: 96 });
+  TEX_SEGNO.info = tex(['💡'], { w: 128, h: 128, font: 96 });
   for (const [k, e] of [['allarme', '⚠️'], ['fatto', '✅'], ['chiuso', '🔒'], ['uscita', '🚪']]) TEX_SEGNO[k] = tex([e], { w: 128, h: 128, font: 96 });
   creaMeteo(); controlli();
   addEventListener('resize', ridimensiona); ridimensiona();
@@ -680,7 +924,7 @@ const metaAlt = () => Math.max(6.5, 5.6 / (innerWidth / innerHeight)) * ze();   
 function impostaZoom(z) { zoom = Math.min(ZMAX, Math.max(ZMIN, z)); opz.onZoom && opz.onZoom(zoom); }
 export function zoomA(z) { zoom = Math.min(ZMAX, Math.max(ZMIN, z || 1)); }
 function limitaPan() {
-  const B = stanza ? { x1: -4, x2: 4, z1: AZ - 8, z2: AZ + 8 } : { x1: -22, x2: 22, z1: -74, z2: 47 };
+  const B = stanza ? { x1: -4, x2: 4, z1: AZ - 8, z2: AZ + 8 } : { x1: -24, x2: 24, z1: LIM.z1 - 3, z2: LIM.z2 + 3 };
   pan.x = Math.min(B.x2 - G.x, Math.max(B.x1 - G.x, pan.x)); pan.z = Math.min(B.z2 - G.z, Math.max(B.z1 - G.z, pan.z));
 }
 function controlli() {
@@ -780,10 +1024,23 @@ export function percorso(x0, z0, x1, z1) {   // ponytail: BFS su griglia 0.8 m, 
   for (let i = 0; i < punti.length;) { let j = punti.length - 1; while (j > i && !vede(a, punti[j])) j--; out.push(punti[j]); a = punti[j]; i = j + 1; }
   return out;
 }
+// ostacoli divisi in fasce da 10 m lungo z: la mappa è lunga, così ogni controllo ne guarda pochi
+let INDICE = null, indicizzati = -1;
+function fascia(z) {
+  if (indicizzati !== OSTACOLI.length) {
+    INDICE = new Map(); indicizzati = OSTACOLI.length;
+    for (const o of OSTACOLI) {
+      const z1 = o.r !== undefined ? o.z - o.r : o.z1, z2 = o.r !== undefined ? o.z + o.r : o.z2;
+      for (let b = Math.floor((z1 - 1) / 10); b <= Math.floor((z2 + 1) / 10); b++) { if (!INDICE.has(b)) INDICE.set(b, []); INDICE.get(b).push(o); }
+    }
+  }
+  return INDICE.get(Math.floor(z / 10)) || [];
+}
 function libero(x, z) {
-  const B = z > 150 ? LIM_P : LIM;
+  const B = z > 100 ? LIM_P : LIM;
   if (x < B.x1 || x > B.x2 || z < B.z1 || z > B.z2) return false;
-  for (const o of OSTACOLI) {
+  for (const v of VARCHI) if (v && !v.aperto && Math.abs(z - v.z) < 0.95 && Math.abs(x) < 2.2) return false;
+  for (const o of fascia(z)) {
     if (o.r !== undefined) { if (Math.hypot(x - o.x, z - o.z) < o.r + 0.35) return false; }
     else if (x > o.x1 - 0.35 && x < o.x2 + 0.35 && z > o.z1 - 0.35 && z < o.z2 + 0.35) return false;
   }
@@ -960,11 +1217,14 @@ function ciclo() {
   requestAnimationFrame(ciclo);
   if (document.hidden || !G.P) return;
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
-  muovi(dt); anima(G.P, dt);
+  muovi(dt); anima(G.P, dt); seguiAmico(dt); pestaPedane();
   let vic = null, dv = 2.9;
   const ks = modo === 'esplora' ? Math.max(1, ze() * 0.75) : 1;   // da lontano nomi e segni più grandi
   for (const [id, n] of NPC) {
     if (n.et) n.et.scale.set(3.4 * ks, 0.85 * ks, 1); n.segno.scale.set(0.9 * ks, 0.9 * ks, 1);
+  }
+  for (const p of PEDANE) if (Math.abs(p.z - G.z) < 90) p.et.scale.set(4.2 * ks, 0.84 * ks, 1);
+  for (const [id, n] of NPC) {
     const d = Math.hypot(n.x - G.x, n.z - G.z);
     if (n.P) {
       if (modo === 'esplora') gira(n, d < 7 ? Math.atan2(G.x - n.x, G.z - n.z) : 0, dt);
@@ -977,7 +1237,8 @@ function ciclo() {
   }
   if (modo === 'esplora' && vic !== vicino) { vicino = vic; opz.onVicino && opz.onVicino(vic); }
   const ev = NPC.get('evento'); if (ev && Math.random() < dt * 1.5) scoppio(ev.x, 2.2, ev.z, ['#ffd23f', '#ffffff'], 8, 1.2, 0.7, -1, 0.15);
-  if (vivi.getto) vivi.getto.scale.y = 1 + Math.sin(t * 6) * 0.12;
+  for (const g of GETTI) if (Math.abs(g.position.z - G.z) < 80) g.scale.y = 1 + Math.sin(t * 6) * 0.12;
+  for (const v of VARCHI) if (v) { const y = v.aperto ? -3.2 : 0; if (Math.abs(v.sbarre.position.y - y) > 0.01) v.sbarre.position.y += (y - v.sbarre.position.y) * Math.min(1, dt * 2.5); }
   if (marcaDest.visible) marcaDest.scale.setScalar(1 + Math.sin(t * 8) * 0.12);
   effetti(dt); sventola(t); if (!stanza) aggiornaMeteo(dt, t);
   meteo.visible = !stanza && !!temaAtt && !!temaAtt.part && temaAtt.part !== 'fuochi';
@@ -1051,16 +1312,26 @@ export function sconfitta() { if (!ok) return; umore(G.P, 'triste', 2.2); const 
 
 // Anteprima dei vestiti per l'armadio: un secondo piccolo renderer, immagini messe in cache
 let RP, scP, camPrev; const PREV = new Map();
+function preparaAnteprima() {
+  if (RP) return;
+  RP = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); RP.setPixelRatio(2); RP.setSize(150, 180);
+  scP = new THREE.Scene(); scP.add(new THREE.HemisphereLight('#ffffff', '#8899aa', 1.3));
+  const l = new THREE.DirectionalLight('#ffffff', 2); l.position.set(3, 5, 6); scP.add(l);
+  camPrev = new THREE.PerspectiveCamera(28, 150 / 180, 0.1, 50); camPrev.position.set(1.6, 1.9, 5.6); camPrev.lookAt(0, 1.08, 0);
+}
+export function anteprimaPersona(aspetto, chiave) {   // foto di un personaggio qualsiasi (es. il compagno da scegliere)
+  if (!ok) return null;
+  if (PREV.has(chiave)) return PREV.get(chiave);
+  preparaAnteprima();
+  const P = persona(aspetto); P.g.rotation.y = 0.3; anima(P, 0); scP.add(P.g);
+  RP.render(scP, camPrev); const url = RP.domElement.toDataURL(); scP.remove(P.g);
+  PREV.set(chiave, url); return url;
+}
 export function anteprima(id, look = {}) {
   if (!ok) return null;
   const chiave = `${id}|${look.acc || ''}|${look.capelli || ''}|${(look.liv || 1) >= 5}`;
   if (PREV.has(chiave)) return PREV.get(chiave);
-  if (!RP) {
-    RP = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); RP.setPixelRatio(2); RP.setSize(150, 180);
-    scP = new THREE.Scene(); scP.add(new THREE.HemisphereLight('#ffffff', '#8899aa', 1.3));
-    const l = new THREE.DirectionalLight('#ffffff', 2); l.position.set(3, 5, 6); scP.add(l);
-    camPrev = new THREE.PerspectiveCamera(28, 150 / 180, 0.1, 50); camPrev.position.set(1.6, 1.9, 5.6); camPrev.lookAt(0, 1.08, 0);
-  }
+  preparaAnteprima();
   const P = creaGiocatore(id, look); P.g.rotation.y = 0.3; anima(P, 0); scP.add(P.g);
   RP.render(scP, camPrev); const url = RP.domElement.toDataURL(); scP.remove(P.g);
   PREV.set(chiave, url); return url;
