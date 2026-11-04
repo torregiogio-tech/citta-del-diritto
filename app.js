@@ -556,7 +556,7 @@ function menu() {
   const opz = [['tutto', 'Tutti gli argomenti'], ['ripasso', `Da ripassare (${daRipassare()})`],
     ...[1, 2, 3, 4, 5, 6, 7, 8].map(g => ['g' + g, `🥊 ${CITTA[g].nome}`]), ...CAPS.map(c => [c.id, c.titolo])];
   const icona = L => L.id === 'biblio' ? '📚' : L.id === 'casa' ? '🏠' : L.id === 'esame' ? '📝' : S.medaglie[L.id] ? '🏅' : '⚔️';
-  apri(`<div class="testa"><h2>Menu</h2>${M.ok ? '<button class="grigio x" id="b-x">✖</button>' : ''}</div>
+  apri(`<div class="testa"><h2>Menu</h2><button class="grigio x" id="b-imp2" aria-label="Impostazioni">⚙️</button>${M.ok ? '<button class="grigio x" id="b-x">✖</button>' : ''}</div>
     <h3>⚡ Studio rapido</h3>
     <select id="filtro" aria-label="Argomento">${opz.map(([v, t]) => `<option value="${v}" ${S.filtro === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>
     <div class="griglia2"><button data-mod="orale">🎓 Domande</button><button data-mod="flashcard">🃏 Flashcard</button>
@@ -577,7 +577,7 @@ function menu() {
   $('#b-speed').onclick = () => { const f = S.filtro, g = /^g\d$/.test(f) ? +f[1] : 0;
     avviaSpeed(f === 'tutto' || f === 'ripasso' ? 'Tutto il programma' : g ? CITTA[g].nome : CAPS.find(c => c.id === f).titolo,
       q => f === 'tutto' || f === 'ripasso' || (g ? q.giorno === g : q.id.startsWith(f)), f, chiudi); };
-  $('#b-imp').onclick = impostazioni;
+  $('#b-imp').onclick = $('#b-imp2').onclick = impostazioni;
 }
 
 // ---------- Armadio ----------
