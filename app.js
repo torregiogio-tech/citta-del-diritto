@@ -127,7 +127,7 @@ const SPEED_N = 10, SPEED_T = 10;   // speed round: 10 domande, 10 secondi l'una
 const KEY = 'dp8bit-v1';   // stessa chiave della versione 8-bit: i progressi restano
 const S = { xp: 0, srs: {}, boy: 'felpa', tema: 'giorno', sound: true, filtro: 'tutto', medaglie: {}, voto: 0, pos: null, aiuto: true,
   monete: 30, reddito: 0, looks: {}, acc: null, cap: null, studio: {}, speed: {}, zoom: 1.8, evo: 0, pal: {},
-  nome: '', compagno: '', amico: 0, enigmi: {}, visti: { 0: true }, imparati: {}, mondo: 0 };   // mondo: versione della mappa (2 = cittadine)
+  nome: '', compagno: '', amico: 0, dev: false, devOpz: { varchi: true, invincibile: true, risposte: false }, enigmi: {}, visti: { 0: true }, imparati: {}, mondo: 0 };   // mondo: versione della mappa (2 = cittadine)
 const DEF = JSON.parse(JSON.stringify(S));
 // Un salvataggio (anche importato da file) può contenere solo i campi noti, con il tipo giusto e senza testo libero: niente HTML iniettato
 const SENZA_TESTO = v => v === null || typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v)) || (typeof v === 'object' && Object.values(v).every(SENZA_TESTO));
@@ -216,6 +216,7 @@ function aggiornaHUD() {
   $('#xp').textContent = S.xp;
   $('#med').textContent = LUOGHI.filter(l => l.giorno && S.medaglie[l.id]).length;
   $('#monete').textContent = S.monete;
+  $('#devpill').hidden = !S.dev;
   const prox = SBLOCCHI.find(s => !sbloccato(s)), e = evo();
   $('#liv').textContent = `Lv.${e.liv} ${e.nome} · ` + (prox ? `Prossimo: ${prox.nome} a ${prox.xp} ⭐` : 'Tutto sbloccato!');
 }
@@ -239,7 +240,7 @@ function mostraAzione(id) {
   const b = $('#azione');
   if (!id || !foglio.hidden) { b.hidden = true; return; }
   const L = LUOGO[id], P = palAtt && gentePalestra(LUOGO[palAtt]).find(p => p.id === id), mon = monumento(id);
-  if (/^varco-\d$/.test(id) && varcoAperto(+id.slice(6))) { b.hidden = true; return; }
+  if (/^varco-\d$/.test(id) && (varcoAperto(+id.slice(6)) || passaggioDev())) { b.hidden = true; return; }
   b.textContent = mon ? `💡 ${mon.nome}: ${S.compagno || 'il compagno'} ti spiega` : /^varco-/.test(id) ? `🔒 Varco ${+id.slice(6) + 1}: cosa serve?`
     : /^leva-/.test(id) ? `🎚 Leggi la leva ${+id.split('-')[2] + 1}` : /^sportello-/.test(id) ? `🗂 ${ENIGMI[+id.slice(10)].titolo}`
     : id === 'evento' ? (incontro && incontro.tipo.lezione ? `💡 ${incontro.tipo.nome} vuole dirti una cosa` : `⚔️ ${incontro ? incontro.tipo.nome : '…'} ti sfida!`) : id === 'casa' ? '👕 Apri l\'armadio' : id === 'biblio' ? '📚 Entra in biblioteca'
@@ -463,7 +464,7 @@ function prossima() {
 function disegnaDomanda() {
   const s = sess, q = s.q, o = s.lotta, cieco = o && o.cieco;
   const cont = s.sim ? `Domanda ${s.i + 1} di ${s.lista.length}` : o ? (cieco ? '🙈 nessun indizio' : `⚔️ ${esc(o.nome)} attacca!`) : `${s.n} risposte · ${s.giuste} giuste`;
-  let h = `<div class="barra-top"><button class="grigio" id="b-fine">${o ? (o.evento ? '🏃 Scappa' : '🏳 Ritirati') : '◀ Fine'}</button><div class="info">${cont}</div></div>`;
+  let h = `<div class="barra-top"><button class="grigio" id="b-fine">${o ? (o.evento ? '🏃 Scappa' : '🏳 Ritirati') : '◀ Fine'}</button>${o && S.dev ? '<button class="viola" id="b-devvinci">🛠 Vinci</button>' : ''}<div class="info">${cont}</div></div>`;
   const cap = `<div class="cap">${esc(q.capitolo)}</div>`, risp = s.fase && !cieco ? `<div class="risp">${md(q.risposta)}</div>` : '';
   const pul = t => esc(String(t).replace(/\*\*/g, ''));
   if (q.tipo === 'flashcard') {
@@ -472,7 +473,7 @@ function disegnaDomanda() {
   if (q.tipo === 'crocette') {
     h += s.ordine.map(i => {
       const via = s.tolte && s.tolte.includes(i);
-      const cls = !s.fase ? (via ? 'spenta' : '') : cieco ? (i === s.scelta ? 'scelta' : 'spenta') : i === q.corretta ? 'giusta' : i === s.scelta ? 'sbagliata' : 'spenta';
+      const cls = !s.fase ? (via ? 'spenta' : devOn('risposte') && i === q.corretta ? 'dev-giusta' : '') : cieco ? (i === s.scelta ? 'scelta' : 'spenta') : i === q.corretta ? 'giusta' : i === s.scelta ? 'sbagliata' : 'spenta';
       return `<button class="opz ${cls}" data-i="${i}" ${s.fase || via ? 'disabled' : ''}>${pul(q.opzioni[i])}</button>`;
     }).join('');
     if (!s.fase && s.hint) h += `<div class="info">💬 ${s.hint}</div>`;
@@ -490,6 +491,7 @@ function disegnaDomanda() {
   }
   apri(h);
   $('#b-fine').onclick = () => s.sim ? fineSim() : o ? fineLotta(true) : riepilogo();
+  if ($('#b-devvinci')) $('#b-devvinci').onclick = () => { s.hp = 0; if (o.cieco) s.risultati = s.lista.map(x => ({ q: x, ok: true })); fineLotta(); };
   const gira = () => { s.fase = 1; suona('tap'); disegnaDomanda(); };
   if ($('#carta') && !s.fase) $('#carta').onclick = gira;
   if ($('#b-mostra')) $('#b-mostra').onclick = gira;
@@ -510,7 +512,7 @@ function esito(ok, resta) {
   if (s.sim || o) s.risultati.push({ q: s.q, ok });
   if (o && !o.cieco) {
     if (ok) { const doppio = s.critico && !s.critUsato; if (doppio) { s.critUsato = true; s.msg = '💥 Colpo critico: danno doppio!'; } s.hp = Math.max(0, s.hp - (doppio ? 2 : 1)); }
-    else { s.mio--; if (s.mio <= 0 && s.vite > 0) { s.vite--; s.mio = 1; s.msg = '💖 Seconda vita! Sei ancora in piedi.'; } }
+    else { if (!devOn('invincibile')) s.mio--; if (s.mio <= 0 && s.vite > 0) { s.vite--; s.mio = 1; s.msg = '💖 Seconda vita! Sei ancora in piedi.'; } }
   }
   if (!s.q.gen) rispondi(s.q, ok);
   if (o && !o.cieco) M.amicoReagisce(ok ? 'felice' : 'triste');
@@ -565,7 +567,7 @@ function menu() {
     ${LUOGHI.filter(L => !M.ok || S.visti[zonaL(L)]).map(L => `<button class="vai ${L.id === 'esame' ? 'giallo' : L.id === 'casa' || L.id === 'biblio' ? 'grigio' : S.medaglie[L.id] ? 'verde' : ''}" data-vai="${L.id}">${icona(L)} ${L.giorno ? `${esc(CITTA[L.giorno].nome)} · ${esc(L.prof)}` : esc(L.prof)}
       <small>${esc(L.nome)}${L.giorno ? ' · ' + CAPS.filter(c => c.giorno === L.giorno).map(c => esc(c.titolo.replace(/^Cap\. \d+ – /, ''))).join(', ') : ''}</small></button>`).join('')}
     <div class="riga"><button class="grigio" id="b-arm">👕 Armadio</button><button class="grigio" id="b-prog">📊 Progressi</button></div>
-    <button class="grigio" id="b-snd">${S.sound ? '🔊 Suono: sì' : '🔇 Suono: no'}</button>`, true);
+    <button class="grigio" id="b-imp">⚙️ Impostazioni</button>`, true);
   if ($('#b-x')) $('#b-x').onclick = chiudi;
   $('#filtro').onchange = e => { S.filtro = e.target.value; save(); };
   document.querySelectorAll('[data-mod]').forEach(b => b.onclick = () => { suona('tap'); b.dataset.mod === 'sim' ? avviaSim() : avvia(b.dataset.mod); });
@@ -575,7 +577,7 @@ function menu() {
   $('#b-speed').onclick = () => { const f = S.filtro, g = /^g\d$/.test(f) ? +f[1] : 0;
     avviaSpeed(f === 'tutto' || f === 'ripasso' ? 'Tutto il programma' : g ? CITTA[g].nome : CAPS.find(c => c.id === f).titolo,
       q => f === 'tutto' || f === 'ripasso' || (g ? q.giorno === g : q.id.startsWith(f)), f, chiudi); };
-  $('#b-snd').onclick = () => { S.sound = !S.sound; save(); suona('tap'); $('#b-snd').textContent = S.sound ? '🔊 Suono: sì' : '🔇 Suono: no'; };
+  $('#b-imp').onclick = impostazioni;
 }
 
 // ---------- Armadio ----------
@@ -971,7 +973,7 @@ function varcoAperto(k) {
 let apertiPrima = null;
 function aggiornaVarchi() {
   const aperti = ENIGMI.map((_, k) => varcoAperto(k));
-  M.varchi(aperti);
+  M.varchi(aperti.map((a, k) => a || passaggioDev()));
   if (apertiPrima) aperti.forEach((a, k) => { if (a && !apertiPrima[k]) { suona('vittoria'); dice(`Il <b>varco ${k + 1}</b> è aperto! Avanti verso <b>${esc(CITTA[k + 1].nome)}</b>.`, 6000); } });
   apertiPrima = aperti;
 }
@@ -1090,6 +1092,42 @@ function presentazione() {   // inizio del gioco: il tuo nome, il compagno e il 
   };
 }
 
+// ---------- Impostazioni e developer mode (per provare il gioco senza giocarlo tutto) ----------
+const devOn = k => !!(S.dev && S.devOpz && S.devOpz[k]);
+const passaggioDev = () => devOn('varchi');
+function impostazioni() {
+  suona('tap'); sess = null; M.imposta('esplora');
+  const sw = (id, on, testo, sotto) => `<button class="interruttore ${on ? 'on' : ''}" id="${id}"><span>${testo}${sotto ? `<small>${sotto}</small>` : ''}</span><i>${on ? 'ON' : 'OFF'}</i></button>`;
+  const st = foglio.querySelector('.interruttore') ? foglio.scrollTop : 0;
+  apri(`<div class="testa"><h2>⚙️ Impostazioni</h2><button class="grigio x" id="b-x">✖</button></div>
+    ${sw('s-suono', S.sound, '🔊 Suoni')}
+    ${sw('s-dev', S.dev, '🛠 Developer mode', 'Per provare il gioco: passi dai varchi, viaggi ovunque, trucchi in lotta')}
+    ${S.dev ? `<div class="card dev">
+      <h3>🛠 Trucchi</h3>
+      ${sw('d-varchi', devOn('varchi'), '🚪 Varchi sempre aperti')}
+      ${sw('d-invincibile', devOn('invincibile'), '🛡 Invincibile in lotta', 'Gli errori non tolgono vita')}
+      ${sw('d-risposte', devOn('risposte'), '👁 Mostra la risposta giusta', 'Nelle crocette è bordata d\'oro')}
+      <div class="info">In lotta compare il tasto <b>🛠 Vinci</b>.</div>
+      <h3>🗺 Vai in una città</h3>
+      <div class="griglia2">${CITTA.map((c, k) => `<button class="grigio" data-citta="${k}">${esc(c.nome)}</button>`).join('')}</div>
+      <h3>🎁 Regali</h3>
+      <div class="riga"><button class="giallo" id="d-xp">+500 ⭐</button><button class="giallo" id="d-monete">+200 🪙</button></div>
+      <div class="riga"><button id="d-medaglie">🏅 Tutte le medaglie</button><button id="d-enigmi">🧩 Tutti i rompicapi</button></div>
+      <div class="info">I regali cambiano i tuoi progressi veri: per tornare indietro c'è «Azzera tutto» in 📊 Progressi.</div>
+    </div>` : ''}`, true);
+  foglio.scrollTop = st;
+  $('#b-x').onclick = chiudi;
+  $('#s-suono').onclick = () => { S.sound = !S.sound; save(); suona('tap'); impostazioni(); };
+  $('#s-dev').onclick = () => { S.dev = !S.dev; S.devOpz = S.devOpz || {}; save(); aggiornaVarchi(); aggiornaHUD(); impostazioni(); };
+  if (!S.dev) return;
+  for (const k of ['varchi', 'invincibile', 'risposte']) $('#d-' + k).onclick = () => { S.devOpz[k] = !S.devOpz[k]; save(); aggiornaVarchi(); impostazioni(); };
+  document.querySelectorAll('[data-citta]').forEach(b => b.onclick = () => { palAtt = null; foglio.hidden = true; M.vaiCitta(+b.dataset.citta); segni(); chiudi(); });
+  $('#d-xp').onclick = () => { aggiungiXP(500); save(); impostazioni(); };
+  $('#d-monete').onclick = () => { cambiaMonete(200); impostazioni(); };
+  $('#d-medaglie').onclick = () => { LUOGHI.filter(l => l.giorno).forEach(l => { S.medaglie[l.id] = true; }); save(); segni(); aggiornaVarchi(); aggiornaHUD(); impostazioni(); };
+  $('#d-enigmi').onclick = () => { ENIGMI.forEach((E, k) => { if (E.tipo !== 'medaglie') { S.enigmi[k] = true; mostraRisolto(k); } }); save(); aggiornaVarchi(); impostazioni(); };
+}
+
 // ---------- Minimappa: piccola = i dintorni; toccala e diventa la mappa del viaggio (viaggio rapido nelle città già visitate) ----------
 const mm = $('#mappa');
 function iconaLuogo(id) {
@@ -1118,7 +1156,7 @@ function disegnaMappa() {
     g.fillRect(X(p.x - p.w / 2), Z(p.z - p.d / 2), p.w * sx, p.d * sx); g.strokeRect(X(p.x - p.w / 2), Z(p.z - p.d / 2), p.w * sx, p.d * sx);
     if (!p.casa) { g.font = `${Math.round(11 * r)}px sans-serif`; g.fillText(iconaLuogo(p.id), X(p.x), Z(p.z)); }
   }
-  const zb = ENIGMI.findIndex((_, k) => !varcoAperto(k));   // oltre il primo varco chiuso: nebbia
+  const zb = passaggioDev() ? -1 : ENIGMI.findIndex((_, k) => !varcoAperto(k));   // oltre il primo varco chiuso: nebbia
   if (zb >= 0) { const zz = Z(-PASSO * zb - 56); if (zz > 0) { g.fillStyle = 'rgba(29,27,46,.55)'; g.fillRect(0, 0, W, zz); } }
   if (d.ev) { g.fillStyle = '#b06bff'; g.beginPath(); g.arc(X(d.ev.x), Z(d.ev.z), (4 + Math.sin(Date.now() / 150) * 1.5) * r, 0, 7); g.fill(); }
   freccia(g, X(d.x), Z(d.z), d.rot, 6 * r, r);
@@ -1136,7 +1174,7 @@ function disegnaViaggio(g, W, H, r, d) {   // la mappa del viaggio: le cittadine
   for (let k = 0; k < n; k++) {
     const visto = !!S.visti[k], C = CITTA[k], qui = d.zona === k;
     if (k < n - 1) { const ym = (y(k) + y(k + 1)) / 2; g.font = `${Math.round(13 * r)}px sans-serif`; g.fillText(varcoAperto(k) ? '🔓' : '🔒', cx, ym); }
-    g.fillStyle = visto ? C.colore : '#5a6a5a'; g.strokeStyle = qui ? '#ffd23f' : '#1d1b2e'; g.lineWidth = (qui ? 5 : 3) * r;
+    g.fillStyle = visto || S.dev ? C.colore : '#5a6a5a'; g.strokeStyle = qui ? '#ffd23f' : '#1d1b2e'; g.lineWidth = (qui ? 5 : 3) * r;
     g.beginPath(); g.arc(cx, y(k), 13 * r, 0, 7); g.fill(); g.stroke();
     g.textAlign = 'left'; g.fillStyle = '#ffffff'; g.font = `900 ${Math.round(13 * r)}px sans-serif`;
     const pal = C.palestra, icona = pal ? (S.medaglie[pal] ? ' 🏅' : '') : '';
@@ -1152,7 +1190,7 @@ mm.addEventListener('click', e => {
   const b = mm.getBoundingClientRect(), fy = (e.clientY - b.top) / b.height;
   const nodo = nodiMappa.reduce((m, n) => Math.abs(n.y - fy) < Math.abs(m.y - fy) ? n : m, nodiMappa[0]);
   mm.classList.remove('grande'); suona('tap');
-  if (nodo && Math.abs(nodo.y - fy) < 0.06 && S.visti[nodo.k] && M.dove().zona !== nodo.k) { palAtt = null; M.vaiCitta(nodo.k); segni(); }
+  if (nodo && Math.abs(nodo.y - fy) < 0.06 && (S.visti[nodo.k] || S.dev) && M.dove().zona !== nodo.k) { palAtt = null; M.vaiCitta(nodo.k); segni(); }
 });
 document.addEventListener('pointerdown', e => { if (mm.classList.contains('grande') && e.target !== mm) mm.classList.remove('grande'); }, true);
 setInterval(() => { disegnaMappa(); controllaZona(); }, 150);
@@ -1185,7 +1223,7 @@ if (S.aiuto && ha3D) $('#aiuto').hidden = false;
 // indirizzi diretti (comodi per i test): #tema-notte, #menu, #mappa, #sim, #palestra-g1, #lotta-g1, #capo-g1, #parla-g3, #incontro, #zoom-4
 const H = location.hash.slice(1);
 if (H && !S.nome && ha3D) { S.nome = 'Giotto'; S.compagno = 'Ale'; M.compagno(AMICI[0], S.compagno); }   // indirizzi di prova: un compagno finto (non salvato finché non giochi)
-const rotte = { menu, armadio, progressi, sim: avviaSim, biblioteca: () => { teletrasporta('biblio'); entraBiblioteca(); }, libro: () => { teletrasporta('biblio'); entraBiblioteca(); lettura(1); },
+const rotte = { menu, armadio, progressi, impostazioni, dev: () => { S.dev = true; aggiornaHUD(); impostazioni(); }, sim: avviaSim, biblioteca: () => { teletrasporta('biblio'); entraBiblioteca(); }, libro: () => { teletrasporta('biblio'); entraBiblioteca(); lettura(1); },
   speed: () => avviaSpeed('Roma dei Palazzi', q => q.giorno === 3, 'g3', chiudi),
   mappa: () => setTimeout(() => { mm.classList.add('grande'); disegnaMappa(); }, 200),
   lezione: () => { M.vaiCitta(0); setTimeout(() => { const t = abitante(); if (M.evento(t.persona, t.nome, 'info')) { incontro = { tipo: t, nato: Date.now() }; parlaIncontro(); } }, 300); },
@@ -1335,6 +1373,13 @@ if (location.search.includes('test')) {
     const giusto = [...document.querySelectorAll('.opz')].find(b => b.textContent === esc(pulisci(fl.domanda)) || b.textContent === pulisci(fl.domanda)); giusto.click();
     ok(S.monete === 5 && S.srs[fl.id] && foglio.innerHTML.includes('ricordato'), 'abitante: se te lo ricordi +5 🪙'); lasciaIncontro();
     ok([1, 2, 3, 4, 5, 6, 7, 8].every(g => (CONSIGLI[g] || []).length), 'consigli del compagno per ogni cittadina');
+    // developer mode
+    Object.assign(S, { dev: false, enigmi: {}, medaglie: {} }); impostazioni(); $('#s-dev').click();
+    ok(S.dev && foglio.querySelector('#d-varchi') && !$('#devpill').hidden, 'developer mode: si attiva dalle impostazioni');
+    ok(!varcoAperto(0) && (!M.ok || M.percorso(2, 20, 0, -PASSO + 14).pop().z < -70), 'developer mode: si passa dai varchi chiusi');
+    entraPalestra('g1'); lottaCapo(); risp(false); ok(sess && sess.mio === 1, 'developer mode: invincibile');
+    $('#b-devvinci').click(); ok(!sess && S.medaglie.g1, 'developer mode: vinci subito'); esciPalestra();
+    impostazioni(); $('#s-dev').click(); ok(!S.dev && $('#devpill').hidden, 'developer mode: si spegne'); chiudi(); aggiornaVarchi();
     entraPalestra('g1'); lottaAllenatore(0); $('#b-chiedi').click();
     ok(sess.tolte.length === 1 && sess.chiesto && !$('#b-chiedi') && foglio.querySelectorAll('.opz:disabled').length === 1, 'chiedi al compagno: una risposta sbagliata in meno');
     fineLotta(true); esciPalestra();
