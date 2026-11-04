@@ -851,7 +851,7 @@ export function biblioteca(on) {
 }
 
 // ---------- Incontri casuali: un personaggio compare vicino a te ----------
-export function evento(aspetto, nome) {
+export function evento(aspetto, nome, segnoId = 'evento') {
   if (!ok || NPC.has('evento') || modo !== 'esplora' || stanza) return false;
   for (let k = 0; k < 20; k++) {
     const an = G.rot + (Math.random() - 0.5) * 2.2, r = 6 + Math.random() * 5;
@@ -860,7 +860,7 @@ export function evento(aspetto, nome) {
     if (!libero(x, z) || [...NPC.values()].some(n => Math.hypot(n.x - x, n.z - z) < 5)) continue;
     const P = persona(aspetto); P.g.position.set(x, 0, z); scena.add(P.g);
     const et = sprite(tex([nome], { fg: '#ffffff', ombra: '#17142a', font: 76 }), 3.4, 0.85); et.position.set(x, 2.95, z); scena.add(et);
-    const segno = sprite(TEX_SEGNO.evento, 0.95, 0.95); segno.position.set(x, 3.75, z); scena.add(segno);
+    const segno = sprite(TEX_SEGNO[segnoId] || TEX_SEGNO.evento, 0.95, 0.95); segno.position.set(x, 3.75, z); scena.add(segno);
     NPC.set('evento', { P, x, z, rot: Math.atan2(G.x - x, G.z - z), segno, et, h: 3.75, evento: true });
     scoppio(x, 1.2, z, ['#ffd23f', '#ffffff', '#b06bff'], 50, 3.5);
     return true;

@@ -14,7 +14,7 @@ const EVO = [
   { liv: 5, nome: 'Giurista', xp: 1300, hp: 5, aiuti: 2, vite: 2, critico: true },
 ];
 const evo = () => EVO[S.evo || 0];
-const HP_ALL = 3, HP_CAPO = 5;   // allenatore: 3 domande da vincere · capopalestra: 5, senza errori
+const HP_ALL = 3, HP_CAPO = 8;   // allenatore: 3 domande da vincere · capopalestra: 8 domande difficili, senza errori
 const TUTOR = ['Marco', 'Luca', 'Davide', 'Paolo', 'Simone', 'Andrea', 'Matteo', 'Fabio'];
 const DOTT = ['Giulia', 'Sara', 'Chiara', 'Elena', 'Marta', 'Irene', 'Laura', 'Anna'];
 const CAPELLI = ['#2a1a10', '#8a4a1a', '#d9a441', '#1a1a1a', '#6a4020', '#c0392b'];
@@ -242,7 +242,7 @@ function mostraAzione(id) {
   if (/^varco-\d$/.test(id) && varcoAperto(+id.slice(6))) { b.hidden = true; return; }
   b.textContent = mon ? `💡 ${mon.nome}: ${S.compagno || 'il compagno'} ti spiega` : /^varco-/.test(id) ? `🔒 Varco ${+id.slice(6) + 1}: cosa serve?`
     : /^leva-/.test(id) ? `🎚 Leggi la leva ${+id.split('-')[2] + 1}` : /^sportello-/.test(id) ? `🗂 ${ENIGMI[+id.slice(10)].titolo}`
-    : id === 'evento' ? `⚔️ ${incontro ? incontro.tipo.nome : '…'} ti sfida!` : id === 'casa' ? '👕 Apri l\'armadio' : id === 'biblio' ? '📚 Entra in biblioteca'
+    : id === 'evento' ? (incontro && incontro.tipo.lezione ? `💡 ${incontro.tipo.nome} vuole dirti una cosa` : `⚔️ ${incontro ? incontro.tipo.nome : '…'} ti sfida!`) : id === 'casa' ? '👕 Apri l\'armadio' : id === 'biblio' ? '📚 Entra in biblioteca'
     : id === 'esame' ? '📝 Parla con Il Professore' : id === 'pal-uscita' ? '🚪 Esci dalla palestra' : id === 'pal-capo' ? `👑 Sfida ${P.nome}`
     : P ? `⚔️ Lotta con ${P.nome}` : `🥊 Palestra di ${L.prof}`;
   b.hidden = false;
@@ -303,7 +303,7 @@ function segni() {
 function mescolaSeme(a, seme) { a = [...a]; let s = seme; const r = () => (s = s * 16807 % 2147483647) / 2147483647;
   for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 function setAllenatore(giorno, k) {   // sempre le stesse 3 domande: così la rivincita è sulla stessa "squadra"
-  const base = mescolaSeme(D.filter(q => q.giorno === giorno && (q.tipo === 'crocette' || q.tipo === 'flashcard')), giorno * 7919 + 1);
+  const base = mescolaSeme(D.filter(q => q.giorno === giorno && !q.difficile && (q.tipo === 'crocette' || q.tipo === 'flashcard')), giorno * 7919 + 1);
   return base.slice(k * 3, k * 3 + 3).map((q, i) => q.tipo === 'crocette' ? q : mcDaFlashcard(q, i % 2 ? 'term' : 'def'));
 }
 let toastT;
@@ -360,14 +360,14 @@ function parlaCapo() {
     $('#b-no').onclick = chiudi; return;
   }
   apri(`<div class="chi">${esc(L.prof)} <small>· capopalestra · ${esc(CITTA[L.giorno].nome)}</small></div><div class="fumetto">${esc(L.frase)}</div>
-    <div class="info">👑 <b>Sfida perfetta</b>: ${HP_CAPO} domande (crocette e domande d'esame). Un errore e sei KO${e.vite ? ` — ma hai 💖 ${e.vite} seconde vite` : ''}.
+    <div class="info">👑 <b>Sfida perfetta</b>: ${HP_CAPO} domande difficili, cioè crocette da esperto, concetti da riconoscere tra simili e domande d'esame in cui devi dire <b>tutti</b> i punti chiave. Un errore e sei KO${e.vite ? ` — ma hai 💖 ${e.vite} seconde vite` : ''}.
       ${S.medaglie[palAtt] ? '<br>🏅 Medaglia già vinta: rigioca per ripassare.' : ''}</div>
     <button class="giallo" id="b-via">⚔️ Sfida il capopalestra</button><button class="grigio" id="b-no">Più tardi</button>`);
   $('#b-via').onclick = lottaCapo; $('#b-no').onclick = chiudi;
 }
 function lottaCapo() {
   const L = LUOGO[palAtt];
-  avviaLotta({ npc: 'pal-capo', nome: L.prof, ruolo: 'Capopalestra', hp: HP_CAPO, perfetto: true, giorni: [L.giorno], orali: true,
+  avviaLotta({ npc: 'pal-capo', nome: L.prof, ruolo: 'Capopalestra', hp: HP_CAPO, perfetto: true, giorni: [L.giorno], capo: true,
     fine: (vinta, s) => {
       const errori = listaErrori(s.risultati.filter(r => !r.ok));
       if (vinta) {
@@ -392,6 +392,17 @@ function avviaLotta(o) {
   sess = { lotta: o, hp: o.hp, mio: mioMax, mioMax, vite: aiuto ? e.vite : 0, aiuti: aiuto ? e.aiuti : 0, critico: aiuto && !!e.critico,
     k: 0, n: 0, giuste: 0, risultati: [], usate: new Set(), lista: o.lista && mescola(o.lista) };
   M.imposta('duello', o.npc); suona('evento'); prossima();
+}
+function domandaCapo(s) {   // più difficile: crocette da esperto, domande d'esame con TUTTI i punti chiave, concetti da riconoscere tra simili
+  const g = s.lotta.giorni[0], pool = D.filter(q => q.giorno === g && !s.usate.has(q.id));
+  const turno = ['x', 'o', 't', 'o', 'x', 't', 'o', 'x'][s.n % 8];
+  const esperte = pool.filter(q => q.difficile), orali = pool.filter(q => q.tipo === 'orale' && q.punti_chiave), fc = pool.filter(q => q.tipo === 'flashcard');
+  const deboli = pool.filter(q => q.tipo === 'crocette' && !q.difficile).sort((a, b) => ((S.srs[a.id] || {}).b || 0) - ((S.srs[b.id] || {}).b || 0));
+  if (turno === 'x' && esperte.length) return pesca(esperte);
+  if (turno === 'o' && orali.length) return pesca(orali);
+  if ((turno === 't' || !deboli.length) && fc.length) return mcDaFlashcard(pesca(fc), 'term');
+  if (deboli.length) return deboli[0];   // la crocetta che sai peggio
+  return orali.length ? pesca(orali) : domandaLotta(s);
 }
 function domandaLotta(s) {
   const o = s.lotta, pool = D.filter(q => o.giorni.includes(q.giorno) && !s.usate.has(q.id)), r = Math.random();
@@ -443,10 +454,10 @@ function prossima() {
   if (s.sim) { if (s.i >= s.lista.length) return fineSim(); s.q = s.lista[s.i]; }
   else if (s.lotta) {
     if (s.lotta.cieco ? s.k >= s.lista.length : s.hp <= 0 || s.mio <= 0) return fineLotta();
-    s.q = s.lista ? s.lista[s.k++ % s.lista.length] : domandaLotta(s); s.usate.add(s.q.base || s.q.id);
+    s.q = s.lista ? s.lista[s.k++ % s.lista.length] : s.lotta.capo ? domandaCapo(s) : domandaLotta(s); s.usate.add(s.q.base || s.q.id);
   }
   else s.q = pesca(pool(s.tipo), s.q && s.q.id);
-  s.fase = 0; s.tolte = null; s.hint = ''; if (s.q.tipo === 'crocette') s.ordine = mescola([0, 1, 2, 3]);
+  s.fase = 0; s.tolte = null; s.hint = ''; s.spunte = new Set(); if (s.q.tipo === 'crocette') s.ordine = mescola([0, 1, 2, 3]);
   barraDuello(); disegnaDomanda(); if (s.lotta) s.msg = '';
 }
 function disegnaDomanda() {
@@ -471,7 +482,11 @@ function disegnaDomanda() {
   } else if (!s.fase) {
     if (q.tipo === 'orale') h += `<div class="info">Rispondi ad alta voce o nella tua testa, poi controlla.</div><button class="giallo" id="b-mostra">Mostra risposta</button>`;
   } else {
-    h += `<div class="riga"><button class="rosso" id="b-no">✘ Non la sapevo</button><button class="verde" id="b-si">✔ La sapevo</button></div>`;
+    if (o && o.capo && q.tipo === 'orale' && q.punti_chiave) {   // il capopalestra vuole TUTTI i punti chiave
+      h += `<div class="info">👑 Il capopalestra vuole sentire <b>tutti</b> i punti chiave. Tocca quelli che hai detto:</div>`
+        + q.punti_chiave.map((p, i) => `<button class="punto ${s.spunte.has(i) ? 'on' : ''}" data-p="${i}">${s.spunte.has(i) ? '✅' : '⬜'} ${md(p)}</button>`).join('')
+        + `<div class="riga"><button class="rosso" id="b-no">✘ Non la sapevo</button><button class="verde" id="b-punti">✔ Conferma ${s.spunte.size}/${q.punti_chiave.length}</button></div>`;
+    } else h += `<div class="riga"><button class="rosso" id="b-no">✘ Non la sapevo</button><button class="verde" id="b-si">✔ La sapevo</button></div>`;
   }
   apri(h);
   $('#b-fine').onclick = () => s.sim ? fineSim() : o ? fineLotta(true) : riepilogo();
@@ -480,6 +495,9 @@ function disegnaDomanda() {
   if ($('#b-mostra')) $('#b-mostra').onclick = gira;
   if ($('#b-si')) $('#b-si').onclick = () => esito(true);
   if ($('#b-no')) $('#b-no').onclick = () => esito(false);
+  if ($('#b-punti')) $('#b-punti').onclick = () => esito(s.spunte.size === q.punti_chiave.length);
+  document.querySelectorAll('.punto').forEach(b => b.onclick = () => { const i = +b.dataset.p, st = foglio.scrollTop;
+    s.spunte.has(i) ? s.spunte.delete(i) : s.spunte.add(i); suona('tap'); disegnaDomanda(); foglio.scrollTop = st; });
   if ($('#b-chiedi')) $('#b-chiedi').onclick = () => {   // il compagno ti toglie una risposta sbagliata
     s.chiesto = true; const via = [0, 1, 2, 3].filter(i => i !== q.corretta && !(s.tolte || []).includes(i));
     s.tolte = [...(s.tolte || []), via[Math.floor(Math.random() * via.length)]]; s.hint = `${amico()}: «Questa no, ne sono sicuro!»`; M.amicoReagisce('punta'); suona('tap'); disegnaDomanda(); };
@@ -738,15 +756,59 @@ function scegliIncontro() {
   return INCONTRI.find(i => (t -= i.peso) <= 0) || INCONTRI[0];
 }
 function cammino(m) {
-  passi += m;
+  passi += m; forseConsiglio(m);
   if (incontro) {
     if (M.distanzaEvento() > 45 || Date.now() - incontro.nato > 150000) { M.togliEvento(); incontro = null; }   // se ne va
     return;
   }
   if (passi < soglia || !foglio.hidden || palAtt) return;
   passi = 0; soglia = 70 + Math.random() * 80;
-  const tipo = scegliIncontro();
-  if (M.evento(tipo.persona, tipo.nome)) { incontro = { tipo, nato: Date.now() }; suona('evento'); }
+  const tipo = Math.random() < 0.5 ? abitante() : scegliIncontro();   // metà delle volte un abitante che ti insegna qualcosa
+  if (M.evento(tipo.persona, tipo.nome, tipo.lezione ? 'info' : 'evento')) { incontro = { tipo, nato: Date.now() }; suona('evento'); }
+}
+// ---------- Abitanti che insegnano: ti raccontano un concetto e poi vedono se te lo ricordi ----------
+const NOMI_ABITANTI = ['Signora Bianchi', 'Il fornaio Gino', 'La studentessa Lia', 'Il postino Carlo', 'Nonno Pino', 'La vigilessa Rita', 'Il libraio Ugo', 'La maestra Vera', 'Il barista Tonio', 'La giornalaia Ada'];
+function abitante() {
+  const r = a => a[Math.floor(Math.random() * a.length)];
+  return { nome: r(NOMI_ABITANTI), lezione: true, persona: { corpo: r(['#e86a5a', '#5aa8ff', '#f2c14e', '#3fae6a', '#b06bff', '#ff8f3f']), gambe: r(['#2b3a5a', '#3a3a4a', '#5a4a3a']),
+    stile: r(['corti', 'lunghi', 'chignon', 'calvo']), capelli: r(['#2a1a10', '#8a4a1a', '#d9a441', '#eeeeee', '#1a1a1a']), ...(Math.random() < 0.3 ? { occhiali: '#2a2420' } : {}) } };
+}
+const giornoQui = () => { const z = M.ok ? M.dove().zona : 0; return z >= 1 && z <= 8 ? z : 1 + Math.floor(Math.random() * 8); };
+function parlaLezione() {
+  const I = incontro; suona('tap'); M.imposta('duello', 'evento');
+  if (!I.f) { const fc = D.filter(q => q.tipo === 'flashcard' && q.giorno === giornoQui()); I.f = fc[Math.floor(Math.random() * fc.length)]; }
+  const z = M.ok ? M.dove().zona : 0;
+  apri(`<div class="chi">💡 ${esc(I.tipo.nome)} <small>· abitante di ${esc(CITTA[z].nome)}</small></div>
+    <div class="fumetto">Lo sai che…? <b>${esc(I.f.domanda)}</b>: ${md(I.f.risposta)}</div>
+    ${S.compagno ? fumettoAmico('Segnatelo! Tra un attimo vediamo se te lo ricordi.') : ''}
+    <button class="giallo" id="b-via">🧠 Mettimi alla prova</button><button class="grigio" id="b-no">Grazie, ciao!</button>`);
+  $('#b-via').onclick = quizLezione; $('#b-no').onclick = lasciaIncontro;
+}
+function quizLezione() {
+  const I = incontro, q = mcDaFlashcard(I.f, 'term'), ord = mescola([0, 1, 2, 3]);
+  apri(`<div class="chi">🧠 ${esc(I.tipo.nome)} ti chiede</div><div class="card"><div class="cap">${esc(q.capitolo)}</div><div class="dom">${esc(q.domanda)}</div></div>
+    ${ord.map(i => `<button class="opz" data-i="${i}">${esc(pulisci(q.opzioni[i]))}</button>`).join('')}`);
+  document.querySelectorAll('.opz').forEach(b => b.onclick = () => {
+    const ok = +b.dataset.i === q.corretta;
+    document.querySelectorAll('.opz').forEach(x => { x.disabled = true; x.classList.add(+x.dataset.i === q.corretta ? 'giusta' : x === b ? 'sbagliata' : 'spenta'); });
+    rispondi(I.f, ok); if (ok) cambiaMonete(5);   // rispondi dà già i punti della flashcard
+    M.reazione(ok); suona(ok ? 'ok' : 'ko'); M.amicoReagisce(ok ? 'felice' : 'triste');
+    foglio.insertAdjacentHTML('beforeend', `${fumettoAmico(ok ? 'Visto? Te lo sei ricordato! <b>+5 ⭐ +5 🪙</b>' : `Quasi! Era <b>${esc(I.f.domanda)}</b>. Tornerà nel ripasso.`)}<button class="giallo" id="b-ok">Torna a esplorare</button>`);
+    foglio.scrollTop = foglio.scrollHeight; $('#b-ok').onclick = lasciaIncontro;
+  });
+}
+// ---------- Consigli del compagno mentre cammini: gli "errori da non fare" della sbobina ----------
+const CONSIGLI = {};
+ARG.filter(a => /-pk$/.test(a.id)).forEach(a => {
+  const coda = a.html.split('Errori da non fare')[1], g = (CAPS.find(c => c.id === a.cap) || {}).giorno;
+  if (coda && g) (CONSIGLI[g] = CONSIGLI[g] || []).push(...[...coda.matchAll(/<li>([\s\S]*?)<\/li>/g)].map(x => x[1]));
+});
+let metriConsiglio = 0;
+function forseConsiglio(m) {
+  metriConsiglio += m;
+  if (metriConsiglio < 160 || !foglio.hidden || !$('#toast').hidden || !S.compagno || incontro) return;
+  metriConsiglio = 0; const l = CONSIGLI[giornoQui()] || []; if (!l.length) return;
+  dice('💡 Occhio all\'esame: ' + l[Math.floor(Math.random() * l.length)], 9000);
 }
 function premioLook(raro) {
   const liberi = LOOKS.filter(l => !S.looks[l.id]);
@@ -767,6 +829,7 @@ function ruba(xp) {
 }
 function parlaIncontro() {
   const I = incontro; if (!I) return chiudi();
+  if (I.tipo.lezione) return parlaLezione();
   suona('tap'); M.imposta('duello', 'evento');   // faccia a faccia
   const riv = !!I.tipo.rivale;
   if (!I.premio) { I.posta = 10 + 5 * Math.floor(Math.random() * 3); I.furto = riv ? 25 : 15;
@@ -1125,6 +1188,7 @@ if (H && !S.nome && ha3D) { S.nome = 'Giotto'; S.compagno = 'Ale'; M.compagno(AM
 const rotte = { menu, armadio, progressi, sim: avviaSim, biblioteca: () => { teletrasporta('biblio'); entraBiblioteca(); }, libro: () => { teletrasporta('biblio'); entraBiblioteca(); lettura(1); },
   speed: () => avviaSpeed('Roma dei Palazzi', q => q.giorno === 3, 'g3', chiudi),
   mappa: () => setTimeout(() => { mm.classList.add('grande'); disegnaMappa(); }, 200),
+  lezione: () => { M.vaiCitta(0); setTimeout(() => { const t = abitante(); if (M.evento(t.persona, t.nome, 'info')) { incontro = { tipo: t, nato: Date.now() }; parlaIncontro(); } }, 300); },
   incontro: () => { teletrasporta('casa'); M.mettiA(0, 14); const t = INCONTRI[5]; if (M.evento(t.persona, t.nome)) { incontro = { tipo: t, nato: Date.now() }; parlaIncontro(); } }, orale: () => avvia('orale'), flashcard: () => avvia('flashcard'), crocette: () => avvia('crocette') };
 if (rotte[H]) rotte[H]();
 else if (/^zoom-/.test(H)) M.zoomA(+H.slice(5));
@@ -1167,7 +1231,9 @@ if (location.search.includes('test')) {
     const risp = giusta => { const d = sess.q;
       if (d.tipo === 'crocette') { const i = giusta ? d.corretta : [0, 1, 2, 3].find(x => x !== d.corretta && !(sess.tolte || []).includes(x));
         document.querySelector(`.opz[data-i="${i}"]`).click(); $('#b-avanti').click(); }
-      else { (d.tipo === 'orale' ? $('#b-mostra') : $('#carta')).click(); $(giusta ? '#b-si' : '#b-no').click(); } };
+      else { (d.tipo === 'orale' ? $('#b-mostra') : $('#carta')).click();
+        if ($('#b-punti') && giusta) { d.punti_chiave.forEach((_, i) => document.querySelector(`.punto[data-p="${i}"]`).click()); $('#b-punti').click(); }
+        else $(giusta ? '#b-si' : '#b-no').click(); } };
     const pulisciCoda = () => { coda.length = 0; $('#modal').hidden = true; };
     Object.assign(S, { xp: 0, evo: 0, pal: {}, medaglie: {} });
     ok(setAllenatore(3, 0).length === 3 && setAllenatore(3, 1).length === 3 && setAllenatore(3, 0).every(q => q.tipo === 'crocette' && q.giorno === 3)
@@ -1182,8 +1248,14 @@ if (location.search.includes('test')) {
     lottaAllenatore(1); giri = 0; while (sess && giri++ < 20) risp(true); ok(S.pal.g1.v[1], 'secondo allenatore battuto');
     lottaCapo(); giri = 0; let giorniOk = true; while (sess && giri++ < 20) { giorniOk = giorniOk && sess.q.giorno === 1; risp(true); }
     ok(giorniOk, 'capopalestra: solo domande del suo giorno');
-    ok(S.medaglie.g1 === true && giri === HP_CAPO && foglio.innerHTML.includes('Medaglia'), 'capopalestra: 5 giuste → medaglia');
+    ok(S.medaglie.g1 === true && giri === HP_CAPO && foglio.innerHTML.includes('Medaglia'), 'capopalestra: tutte giuste → medaglia');
     lottaCapo(); risp(true); risp(false); ok(!sess && foglio.innerHTML.includes('ha vinto'), 'capopalestra: un errore e sei KO');
+    lottaCapo(); risp(true); ok(sess.q.tipo === 'orale' && sess.q.punti_chiave, 'capopalestra: domanda d\'esame al 2° turno');
+    $('#b-mostra').click(); document.querySelector('.punto').click(); ok(foglio.querySelector('.punto.on'), 'punti chiave da spuntare');
+    $('#b-punti').click(); ok(!sess && foglio.innerHTML.includes('ha vinto'), 'capopalestra: se non dici tutti i punti chiave sei KO');
+    lottaCapo(); risp(true); risp(true); risp(true); ok(sess && sess.risultati.some(r => r.q.difficile), 'capopalestra: usa le crocette da esperto');
+    fineLotta(true);
+    ok(!setAllenatore(1, 0).some(q => q.difficile) && D.filter(q => q.difficile).length >= 80, 'domande da esperto: solo per il capopalestra');
     // evoluzione: più vita, 50/50, seconda vita
     pulisciCoda(); S.xp = 0; S.evo = 0; aggiungiXP(EVO[2].xp);
     ok(S.evo === 2 && coda.some(m => m.titolo.includes('Evoluzione')) && evo().vite === 1, 'evoluzione a Laureando');
@@ -1258,6 +1330,11 @@ if (location.search.includes('test')) {
     ok(S.nome === 'Giulia' && S.compagno === '<b>Marco</b>' && S.amico === 2 && amico() === '&lt;b&gt;Marco&lt;/b&gt;', 'presentazione: nome, compagno (testo ripulito) e aspetto');
     ok(pulito({ nome: 'x'.repeat(50) }).nome.length === 20, 'nome lungo tagliato');
     parlaAmico(); ok(foglio.innerHTML.includes('compagno di studio'), 'il compagno ti dice cosa fare'); chiudi();
+    S.monete = 0; incontro = { tipo: abitante(), nato: Date.now() }; parlaIncontro(); ok(foglio.innerHTML.includes('Lo sai che'), 'abitante: ti racconta un concetto');
+    const fl = incontro.f; $('#b-via').click(); document.querySelector(`.opz[data-i="${mcDaFlashcard(fl, 'term').corretta}"]`) && 0;
+    const giusto = [...document.querySelectorAll('.opz')].find(b => b.textContent === esc(pulisci(fl.domanda)) || b.textContent === pulisci(fl.domanda)); giusto.click();
+    ok(S.monete === 5 && S.srs[fl.id] && foglio.innerHTML.includes('ricordato'), 'abitante: se te lo ricordi +5 🪙'); lasciaIncontro();
+    ok([1, 2, 3, 4, 5, 6, 7, 8].every(g => (CONSIGLI[g] || []).length), 'consigli del compagno per ogni cittadina');
     entraPalestra('g1'); lottaAllenatore(0); $('#b-chiedi').click();
     ok(sess.tolte.length === 1 && sess.chiesto && !$('#b-chiedi') && foglio.querySelectorAll('.opz:disabled').length === 1, 'chiedi al compagno: una risposta sbagliata in meno');
     fineLotta(true); esciPalestra();
